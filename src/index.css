@@ -1,0 +1,128 @@
+@import 'tailwindcss';
+
+/* Wide enough for the side rail and tall enough to fit it between the Exit
+   button and the view controls. Width alone would hand the rail to a phone
+   held sideways, where it runs over both. */
+@custom-variant tall (@media (min-width: 48rem) and (min-height: 37.5rem));
+
+/* A phone held sideways: little height, so only the essentials stay. */
+@custom-variant short (@media (max-height: 31.25rem));
+
+@theme {
+  --color-void: #03040b;
+  --color-void-raised: #080b18;
+  --color-ink: #e7ebf7;
+  --color-ink-dim: #a6aec6;
+  --color-muted: #7d86a0;
+  --color-edge: #1b2238;
+  --color-blue: #2f6bff;
+  --color-violet: #7c4dff;
+  --color-cyan: #22d3ee;
+
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-hero: clamp(2.5rem, 8.2vw, 7.25rem);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-display);
+    font-weight: 300;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  canvas {
+    display: block;
+    touch-action: none;
+  }
+
+  ::selection {
+    background: rgb(124 77 255 / 0.4);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-cyan);
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  /* Restrained glass: a single soft surface, a hairline edge, no heavy glow. */
+  .glass {
+    background-image: linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 0.055),
+      rgb(255 255 255 / 0.018)
+    );
+    border: 1px solid rgb(255 255 255 / 0.08);
+    backdrop-filter: blur(20px) saturate(135%);
+    -webkit-backdrop-filter: blur(20px) saturate(135%);
+  }
+
+  .readout {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+  }
+
+  /* Headline fill: cool white falling into cyan, no banding. */
+  .text-cosmic {
+    background-image: linear-gradient(
+      104deg,
+      #ffffff 8%,
+      #d8e4ff 38%,
+      #8fd4ff 66%,
+      #6ea8ff 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .hairline {
+    background-image: linear-gradient(
+      to right,
+      transparent,
+      rgb(255 255 255 / 0.22),
+      transparent
+    );
+  }
+}
+
+/* Honour the OS reduced-motion setting for every CSS-driven animation.
+   JS-driven motion (GSAP, Framer Motion, the 3D scene) is gated separately
+   through the usePrefersReducedMotion hook. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
