@@ -16,6 +16,9 @@ const ALWAYS = { current: { value: 1 } }
 const worldPosition = new THREE.Vector3()
 const offset = new THREE.Vector3()
 const projected = new THREE.Vector3()
+// Sunlight in a planet's system: from far off, one direction for all.
+const SUNLIGHT = [-30, 12, 22]
+const TOWARDS_SUN = new THREE.Vector3(...SUNLIGHT).normalize()
 
 function orbitLine(radius) {
   const points = []
@@ -51,16 +54,17 @@ function Surface({ visual, size, reducedMotion }) {
         />
       </mesh>
       {visual.atmosphere && <PlanetAtmosphere geometry={SPHERE} color={visual.atmosphere.color} intensity={visual.atmosphere.glow} />}
-      {visual.rings && solar === null && <Rings rings={visual.rings} />}
-      {visual.rings && solar && <SaturnRings inner={visual.rings.inner} outer={visual.rings.outer} texture={solar.rings} opacity={visual.rings.opacity} />}
+      {visual.rings && <Rings id={visual.solarId ?? visual.id} rings={visual.rings} />}
     </group>
   )
 }
 
-function Rings({ rings }) {
+// Each ringed world gets its own profile; any other ring is a faint dust band.
+function Rings({ id, rings }) {
   const gl = useThree((state) => state.gl)
   const textures = useMemo(() => getPlanetTextures(gl), [gl])
-  return <SaturnRings inner={rings.inner} outer={rings.outer} texture={textures.rings} opacity={rings.opacity} />
+  const texture = textures.ringProfiles[id] ?? textures.ringProfiles.faint
+  return <SaturnRings inner={rings.inner} outer={rings.outer} texture={texture} opacity={rings.opacity} />
 }
 
 function Body({ body, selected, onSelect, register, reducedMotion }) {
@@ -155,6 +159,7 @@ export default function SystemView({ system, selectedId, onSelect, view, reduced
     const f = followed.current
     const entry = nodes.current.get(selectedId)
     const dt = Math.min(delta, 0.1)
+    const planetCentred = system.center?.kind === 'body'
 
     if (entry) {
       entry.node.getWorldPosition(worldPosition)
@@ -172,6 +177,11 @@ export default function SystemView({ system, selectedId, onSelect, view, reduced
         const wanted = Math.max(entry.size * 5.2, 3)
         const current = camera.position.distanceTo(c.target)
         offset.copy(camera.position).sub(c.target).normalize()
+        // Round a planet, arrive on a moon's sunlit side rather than its night.
+        if (planetCentred) {
+          offset.lerp(TOWARDS_SUN, k * 0.5).normalize()
+          camera.position.copy(c.target).addScaledVector(offset, current)
+        }
         camera.position.addScaledVector(offset, (wanted - current) * k)
         if (c.target.distanceTo(worldPosition) < 0.02 && Math.abs(wanted - current) < 0.08) f.arriving = 0
       } else {
@@ -222,7 +232,10 @@ export default function SystemView({ system, selectedId, onSelect, view, reduced
     <>
       <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.08} rotateSpeed={0.55} zoomSpeed={0.8} panSpeed={0.7} screenSpacePanning minDistance={1.2} maxDistance={reach * 3 + 30} />
       <ambientLight intensity={0.1} />
-      <pointLight position={[0, 0, 0]} intensity={140} decay={1.4} color="#fff4e4" />
+      {/* A star lights its planets from the centre. Round a planet the light
+          is the distant Sun's, one direction for the planet and its moons
+          alike (the directional light below), never the planet itself. */}
+      {center?.kind !== 'body' && <pointLight position={[0, 0, 0]} intensity={140} decay={1.4} color="#fff4e4" />}
 
       {system.cluster && <Cluster entry={system.cluster} />}
 
@@ -239,7 +252,7 @@ export default function SystemView({ system, selectedId, onSelect, view, reduced
       {center?.kind === 'body' && (
         <group ref={(node) => node && register(center.entry.id, node, system.centerSize)}>
           <Surface visual={{ ...center.visual, solarId: center.entry.id }} size={system.centerSize} reducedMotion={reducedMotion} />
-          <directionalLight position={[-30, 12, 22]} intensity={2.4} color="#fff2e0" />
+          <directionalLight position={SUNLIGHT} intensity={2.4} color="#fff2e0" />
         </group>
       )}
 

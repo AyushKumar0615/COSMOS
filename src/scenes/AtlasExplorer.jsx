@@ -64,10 +64,24 @@ export default function AtlasExplorer({ atlas, setAtlas, view, reducedMotion, vi
   }, [focusId])
 
   // Into a system: fly there first, then fade across. Out: fade back at once.
+  // The swap re-runs this effect mid-timeline; that run must leave the
+  // fade-in going, or the veil stops nearly opaque over the new system.
+  const swapped = useRef(false)
   useEffect(() => {
+    if (systemId === shownSystem) {
+      if (swapped.current) {
+        swapped.current = false
+        return
+      }
+      // The request was withdrawn before the swap: clear any veil.
+      tween.current?.kill()
+      tween.current = reducedMotion ? null : gsap.to(veil.current, { value: 0, duration: 0.3 })
+      if (reducedMotion) veil.current.value = 0
+      return
+    }
     tween.current?.kill()
-    if (systemId === shownSystem) return
     const swap = () => {
+      swapped.current = true
       setShownSystem(systemId)
       refresh()
     }
@@ -81,8 +95,8 @@ export default function AtlasExplorer({ atlas, setAtlas, view, reducedMotion, vi
       .to(veil.current, { value: 1, duration: 0.45, delay: fromMap ? 1.25 : 0, ease: 'power2.in' })
       .call(swap)
       .to(veil.current, { value: 0, duration: 0.6, ease: 'power2.out' })
-    return () => tween.current?.kill()
   }, [systemId, shownSystem, reducedMotion])
+  useEffect(() => () => tween.current?.kill(), [])
 
   const system = useMemo(() => (shownSystem ? buildSystem(shownSystem) : null), [shownSystem])
 

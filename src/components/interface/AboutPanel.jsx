@@ -1,21 +1,21 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
+import { BLACK_HOLE_IDS, GALAXY_IDS, NEBULA_IDS } from '../../data/navigation.js'
 
 const BUILT = [
   'Interactive solar system with NASA-sourced figures for every body',
+  'Moons, dwarf planets, asteroids, comets and belts from JPL orbital data',
+  'Real dates, eclipses, auroras, and Voyager, New Horizons and Parker placed from JPL Horizons',
   'Guided tour of the Sun and all eight planets',
   'Free flight with keyboard, mouse, touch and joystick controls',
-  'Black holes: four, ray-traced, with a guided descent and five missions',
-  'Galaxies: Milky Way, Andromeda, Whirlpool, Sombrero and Triangulum',
-  'Nebulae: Orion, Crab, Eagle, Carina, Pillars, Horsehead, Ring and Helix',
-  'Phenomena: supernova, pulsar, wormhole, spacetime, scale and exoplanets',
+  `Black holes: ${BLACK_HOLE_IDS.length}, ray-traced, with a guided descent and five missions`,
+  `${GALAXY_IDS.length} galaxies and ${NEBULA_IDS.length} nebulae to explore`,
+  'Phenomena: supernova, pulsar, wormhole, spacetime, scale, stellar life cycle and exoplanets',
+  'Universe atlas: a searchable catalogue of stars, systems and deep-sky objects',
   'Mission archive: fourteen missions from NASA, ISRO, ESA and JAXA',
 ]
 
-const NEXT = [
-  'Constellation overlays and a time control',
-  'Moons, asteroids and comets beyond the eight planets',
-]
+const NEXT = ['Constellation overlays and on-screen labels', 'A true-scale mode for distances and sizes']
 
 export default function AboutPanel({ onClose, reducedMotion }) {
   const panelRef = useRef(null)

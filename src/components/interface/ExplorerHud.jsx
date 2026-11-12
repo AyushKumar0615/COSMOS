@@ -296,15 +296,17 @@ export default function ExplorerHud({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             // With a control dock along the bottom, the button moves up out of its way.
-            className={`glass pointer-events-auto absolute right-4 flex items-center gap-2.5 rounded-full py-2.5 pl-4 pr-5 md:bottom-auto md:right-6 md:top-24 lg:right-10 ${
+            // Kept clear of the Exit button on its row: a long name truncates.
+            aria-label={`About ${item.name}`}
+            className={`glass pointer-events-auto absolute right-4 flex max-w-[calc(100vw-8.5rem)] items-center gap-2.5 rounded-full py-2.5 pl-4 pr-5 md:bottom-auto md:max-w-none md:right-6 md:top-24 lg:right-10 ${
               docked ? 'top-20 sm:top-24' : 'bottom-20'
             }`}
           >
-            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-cyan" aria-hidden="true">
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-cyan" aria-hidden="true">
               <circle cx="8" cy="8" r="6" {...stroke} />
               <path d="M8 7.2v4M8 4.8v.01" {...stroke} />
             </svg>
-            <span className="eyebrow text-ink-dim">About {item.name}</span>
+            <span className="eyebrow min-w-0 truncate text-ink-dim">About {item.name}</span>
           </motion.button>
         )}
       </AnimatePresence>
