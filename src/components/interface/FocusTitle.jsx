@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BODIES_BY_ID } from '../../data/planets.js'
+import { SATELLITES_BY_ID } from '../../data/satellites.js'
+import { SOLAR_BODIES_BY_ID } from '../../data/solarNames.js'
 
 const VISIBLE_MS = 1500
 
@@ -37,7 +39,7 @@ export default function FocusTitle({ bodyId, reducedMotion }) {
           >
             <span className="eyebrow text-cyan/80">Approaching</span>
             <span className="text-[clamp(2.25rem,6vw,4.5rem)] font-light uppercase leading-none tracking-[0.12em] text-ink/90">
-              {BODIES_BY_ID[shown].name}
+              {(BODIES_BY_ID[shown] ?? SATELLITES_BY_ID[shown] ?? SOLAR_BODIES_BY_ID[shown])?.name}
             </span>
             <span className="mt-1 h-px w-24 bg-gradient-to-r from-transparent via-cyan/60 to-transparent" />
           </motion.div>

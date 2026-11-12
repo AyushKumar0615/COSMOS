@@ -146,6 +146,13 @@ test('performance: load weight, frame rates and memory', { timeout: 90000 }, asy
 
   await enter(page)
   const rates = { solar: await page.evaluate(fps) }
+  // Close-ups: the per-frame Sun shader and the most detailed planet.
+  await page.click('Sun')
+  await sleep(3500)
+  rates.sunCloseUp = await page.evaluate(fps)
+  await page.click('Earth')
+  await sleep(3500)
+  rates.earthCloseUp = await page.evaluate(fps)
   await page.click('Galaxies')
   await page.waitFor(textIncludes('andromeda'), 'galaxies')
   await sleep(1600)
@@ -756,16 +763,186 @@ test('mission toolbar sticks only when the viewport can spare the room', { timeo
   }
 })
 
+// The textured sphere at the camera's focus point: the selected planet, not
+// one of its moons (which can be nearer the camera).
 const nearestPlanet = `(() => {
   const camera = __cosmos.camera, v = camera.position.clone(); let best = null
+  const focus = __cosmos.get().controls?.target ?? camera.position
   __cosmos.scene.traverse((o) => {
-    if (!o.isMesh || !o.material?.isMeshStandardMaterial || !o.material.map) return
+    if (!o.isMesh || !o.material?.isMeshStandardMaterial || !o.material.map || o.geometry.type !== 'SphereGeometry') return
     o.getWorldPosition(v)
-    const d = v.distanceTo(camera.position)
+    const d = v.distanceTo(focus)
     if (!best || d < best.d) { const p = v.clone().project(camera); best = { d, x: (p.x + 1) / 2 * innerWidth, y: (1 - p.y) / 2 * innerHeight } }
   })
   return best
 })()`
+
+// Meteors live in one instanced mesh; a slot is in use once its brightness is set.
+const meteorsSpawned = `(() => { let n = -1; __cosmos.scene.traverse((o) => { const a = o.geometry?.attributes?.aLook; if (a) { n = 0; for (let i = 0; i < a.count; i += 1) if (a.getW(i) > 0) n += 1 } }); return n })()`
+const craftCount = `(() => { let n = 0; __cosmos.scene.traverse((o) => { if (o.isPoints && o.geometry.attributes.phase) n += 1 }); return n })()`
+const switchInput = (label) => `[...document.querySelectorAll('[aria-label="Visual effects"] label')].find((l) => l.innerText.split('\\n')[0].trim() === ${JSON.stringify(label)})?.querySelector('input')`
+// The switch's own input is visually hidden behind its track, as usual; a click on the label is what a visitor does.
+const flip = (page, label) => page.evaluate(`${switchInput(label)}.closest('label').click()`)
+
+test('solar effects: spacecraft to inspect, meteors, and switches that persist', { timeout: 90000 }, async () => {
+  const page = await open(VIEWPORTS.desktop)
+  await enter(page)
+  assert.ok(await page.evaluate(craftCount) >= 5, 'spacecraft are in the scene')
+
+  // Meteors are sporadic, with showers: one should appear within half a minute.
+  await page.waitFor(`${meteorsSpawned} > 0`, 'a meteor', 30000)
+  await snap(page, 'effects', '01-solar')
+
+  // Esc closes the menu only: it must not also leave the solar system.
+  await page.click('Effects')
+  await page.waitFor(`document.querySelector('[aria-label="Visual effects"]')`, 'effects panel')
+  await page.key('Escape')
+  await page.waitFor(`!document.querySelector('[aria-label="Visual effects"]')`, 'menu closed by Esc', 3000)
+  await sleep(600)
+  assert.ok(await page.evaluate(`!!document.querySelector('[aria-label="Zoom in"]')`), 'still in the solar system')
+
+  await page.click('Effects')
+  await page.waitFor(`document.querySelector('[aria-label="Visual effects"]')`, 'effects panel')
+  for (const label of ['Meteors', 'Spacecraft', 'Orbit lines', 'Distant events']) {
+    assert.equal(typeof (await page.evaluate(`${switchInput(label)}?.checked`)), 'boolean', `${label} switch`)
+  }
+  await snap(page, 'effects', '02-panel')
+
+  // Fly to the ISS from the list: its facts, and the camera close to it.
+  await page.click('International Space Station')
+  await page.waitFor(textIncludes('crewed space station'), 'ISS panel')
+  await page.waitFor(textIncludes('51.6°'), 'ISS inclination')
+  await sleep(4500)
+  await snap(page, 'effects', '03-iss')
+  const distance = await page.evaluate(`(() => { let d = 99; __cosmos.scene.traverse((o) => { if (o.isPoints && o.geometry.attributes.phase && o.visible) d = Math.min(d, o.getWorldPosition(__cosmos.camera.position.clone()).distanceTo(__cosmos.camera.position)) }); return d })()`)
+  assert.ok(distance < 0.6, `camera is beside the spacecraft (${distance})`)
+  await page.click('Next: Tiangong')
+  await page.waitFor(textIncludes('china manned space agency'), 'Tiangong panel')
+  await page.click('Back to Earth')
+  await page.waitFor(textIncludes('spacecraft here'), 'Earth lists its spacecraft')
+
+  // Spacecraft off: they leave the scene and cannot stay selected.
+  await page.click('Hubble')
+  await page.waitFor(textIncludes('28.5°'), 'Hubble panel')
+  await page.click('Effects')
+  await page.waitFor(`document.querySelector('[aria-label="Visual effects"]')`, 'effects panel')
+  await flip(page, 'Spacecraft')
+  await page.waitFor(`${craftCount} === 0`, 'spacecraft removed')
+  await page.waitFor(`!(${textIncludes('28.5°')})`, 'the spacecraft panel closes', 3000)
+
+  // Meteors off and intensity at zero: nothing new spawns.
+  await flip(page, 'Meteors')
+  await page.waitFor(`${meteorsSpawned} === -1`, 'meteors removed')
+  await setSlider(page, 40)
+  await page.goto(`${server.origin}/?debug`)
+  await enter(page)
+  assert.equal(await page.evaluate(craftCount), 0, 'spacecraft stay off after a reload')
+  assert.equal(await page.evaluate(meteorsSpawned), -1, 'meteors stay off after a reload')
+  assert.equal(await page.evaluate(`JSON.parse(localStorage.getItem('cosmos.effects.v1')).intensity`), 0.4)
+  await page.evaluate(`localStorage.removeItem('cosmos.effects.v1')`)
+  assert.deepEqual(page.problems, [])
+  await page.close()
+})
+
+test('probes: Voyager and Parker from JPL Horizons, with distances for the date', { timeout: 90000 }, async () => {
+  const page = await open(VIEWPORTS.desktop)
+  await enter(page)
+  await page.click('Find')
+  await page.type('Voyager 1')
+  await page.key('Enter')
+  await page.waitFor(textIncludes('interstellar probe'), 'Voyager 1 panel')
+  await page.waitFor(textIncludes('not live tracking'), 'ephemeris readout')
+  const text = await page.evaluate(bodyText)
+  const sun = Number(/From the Sun ([\d,.]+) AU/i.exec(text)?.[1].replace(/,/g, ''))
+  assert.ok(sun > 160 && sun < 200, `Voyager 1 from the Sun: ${sun} AU`)
+  assert.match(text, /Radio signal time from Earth \d+ h \d+ min/i)
+  await sleep(4000)
+  await snap(page, 'probes', '01-voyager-1')
+
+  await page.click('Find')
+  await page.type('Parker')
+  await page.key('Enter')
+  await page.waitFor(textIncludes('solar probe'), 'Parker panel')
+  await sleep(4000)
+  await snap(page, 'probes', '02-parker')
+
+  // Real dates beyond the downloaded ephemeris: no invented position.
+  await page.click('Time:')
+  await page.click('Real dates')
+  await page.evaluate(`(() => {
+    const input = document.getElementById('sim-date')
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '2040-01-01')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+  await page.waitFor(textIncludes('no ephemeris downloaded for this date'), 'out-of-range notice')
+  await page.key('Escape')
+  await page.evaluate(`localStorage.removeItem('cosmos.effects.v1')`)
+  assert.deepEqual(page.problems, [])
+  await page.close()
+})
+
+test('time: pause, real dates into a lunar eclipse, and moon panels', { timeout: 120000 }, async () => {
+  const page = await open(VIEWPORTS.desktop)
+  await enter(page)
+  const timeLabel = `document.querySelector('[aria-controls="time-panel"]').getAttribute('aria-label')`
+
+  // Pause stops the clock; the button says so.
+  await page.click('Time:')
+  await page.waitFor(`document.getElementById('time-panel')`, 'time panel')
+  await page.click('Pause')
+  await page.waitFor(`${timeLabel}.includes('paused')`, 'paused')
+  // The simulated time in the button holds while paused.
+  const shown = `document.querySelector('[aria-controls="time-panel"]').innerText`
+  const held = await page.evaluate(shown)
+  assert.match(held, /Paused/i)
+  await sleep(1500)
+  assert.equal(await page.evaluate(shown), held, 'time holds while paused')
+  await page.click('Play')
+
+  // Real dates: the evening before the total lunar eclipse of 14 March 2025,
+  // then an hour a second until it begins.
+  await page.click('Real dates')
+  await page.evaluate(`(() => {
+    const input = document.getElementById('sim-date')
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '2025-03-13')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+  await page.click('1 hour / s')
+  await page.waitFor(`${timeLabel}.includes('2025')`, 'the date shows in the button')
+  await page.waitFor(textIncludes('lunar eclipse'), 'lunar eclipse banner', 40000)
+  await page.waitFor(textIncludes('computed for this date'), 'banner says it is computed')
+  await page.key('Escape')
+  await page.waitFor(`!document.getElementById('time-panel')`, 'time panel closed')
+  await snap(page, 'time', '01-lunar-eclipse')
+
+  // A moon's panel, its neighbours, and the way back to its planet.
+  await page.click('Find')
+  await page.type('Europa')
+  await page.key('Enter')
+  await page.waitFor(textIncludes('moon of jupiter'), 'Europa panel')
+  await page.waitFor(textIncludes('jpl satellite elements'), 'source link')
+  await sleep(3000)
+  await snap(page, 'time', '02-europa')
+  await page.click('Next: Ganymede')
+  await page.waitFor(`document.getElementById('body-panel-title')?.innerText === 'Ganymede'`, 'Ganymede panel')
+  await page.click('Back to Jupiter')
+  await page.waitFor(textIncludes('moons shown'), 'Jupiter lists its moons')
+  assert.deepEqual(page.problems, [])
+  await page.close()
+})
+
+test('reduced motion: no meteors, and their switch says why', { timeout: 40000 }, async () => {
+  const page = await open({ ...VIEWPORTS.desktop, reducedMotion: true })
+  await page.waitFor(textIncludes('enter universe'), 'landing', 4000)
+  await page.click('Enter Universe')
+  await page.waitFor(`document.querySelector('[aria-label="Zoom in"]')`, 'entry', 2000)
+  await sleep(1500)
+  assert.equal(await page.evaluate(meteorsSpawned), -1)
+  await page.click('Effects')
+  await page.waitFor(textIncludes('off while reduced motion is on'), 'explanation')
+  assert.equal(await page.evaluate(`${switchInput('Meteors')}.disabled`), true)
+  await page.close()
+})
 
 test('planets come back after the GPU context is lost and restored', { timeout: 60000 }, async () => {
   const page = await open(VIEWPORTS.desktop, '&quality=high')

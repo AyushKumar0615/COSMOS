@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import gsap from '../../lib/gsapConfig.js'
 import * as THREE from 'three'
@@ -7,6 +7,7 @@ import {
   framingRadius,
   overviewPosition,
 } from '../../lib/cameraFraming.js'
+import { SATELLITES_BY_ID, isProbe } from '../../data/satellites.js'
 import { useViewShift } from '../../hooks/useViewShift.js'
 
 export const LANDING_POSITION = new THREE.Vector3(0, 0.8, 17)
@@ -122,6 +123,8 @@ export default function CameraRig({
     arc: 0,
   })
   const lastBodyPosition = useRef(new THREE.Vector3())
+  const hostPosition = useMemo(() => new THREE.Vector3(), [])
+  const awayFromSun = useMemo(() => new THREE.Vector3(), [])
   const zoom = useRef({ active: false, progress: { value: 0 }, from: 0, to: 0, tween: null })
   const handledCommand = useRef(null)
 
@@ -135,7 +138,29 @@ export default function CameraRig({
     getBodyPosition(id, bodyPosition)
     if (id) {
       outTarget.copy(bodyPosition)
-      viewDirection(bodyPosition, sideSign, view, scratch)
+      const craft = SATELLITES_BY_ID[id]
+      if (craft) {
+        // Look past the spacecraft at its planet, from a little sunward, so
+        // the lit globe fills the background.
+        getBodyPosition(craft.host, hostPosition)
+        if (isProbe(craft)) {
+          // A probe far from any planet: from the side and a little sunward,
+          // so its lit dish or heat shield shows in profile.
+          awayFromSun.copy(bodyPosition).normalize()
+          scratch.crossVectors(UP, awayFromSun).normalize().multiplyScalar(0.85).addScaledVector(awayFromSun, -0.4).addScaledVector(UP, 0.3).normalize()
+        } else if (craft.sim.l2) {
+          // Webb is seen from the shaded side of its sunshield, in front of
+          // the gold mirror (which faces up in the model's frame).
+          awayFromSun.copy(hostPosition).normalize()
+          scratch.crossVectors(UP, awayFromSun).normalize().multiplyScalar(0.35).addScaledVector(awayFromSun, 0.55).addScaledVector(UP, 0.8).normalize()
+        } else {
+          scratch.copy(bodyPosition).sub(hostPosition).normalize()
+          awayFromSun.copy(hostPosition).normalize()
+          scratch.addScaledVector(awayFromSun, -0.7).addScaledVector(UP, 0.35).normalize()
+        }
+      } else {
+        viewDirection(bodyPosition, sideSign, view, scratch)
+      }
       const distance =
         focusDistance(camera, framingRadius(id)) * (view?.distanceScale ?? 1)
       outCamera.copy(bodyPosition).addScaledVector(scratch, distance)
@@ -371,10 +396,20 @@ export default function CameraRig({
         }
       } else if (mode.current === 'follow') {
         // Carry camera and target along by the planet's motion, preserving
-        // whatever orbit offset the user has dialled in.
+        // whatever orbit offset the user has dialled in. The offset also
+        // turns with the planet's progress round the Sun, so the lit side
+        // that was framed stays framed: a fast inner planet would otherwise
+        // swing its night side to the camera within seconds.
         getBodyPosition(f.focusId, bodyPosition)
-        scratch.copy(bodyPosition).sub(lastBodyPosition.current)
-        camera.position.add(scratch)
+        const last = lastBodyPosition.current
+        scratch.copy(camera.position).sub(last)
+        if (last.lengthSq() > 1e-6 && bodyPosition.lengthSq() > 1e-6) {
+          let turn = Math.atan2(bodyPosition.z, bodyPosition.x) - Math.atan2(last.z, last.x)
+          if (turn > Math.PI) turn -= Math.PI * 2
+          if (turn < -Math.PI) turn += Math.PI * 2
+          scratch.applyAxisAngle(UP, -turn)
+        }
+        camera.position.copy(bodyPosition).add(scratch)
         controls.target.copy(bodyPosition)
         lastBodyPosition.current.copy(bodyPosition)
       }

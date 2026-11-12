@@ -49,9 +49,9 @@ const ATMOSPHERES = {
 }
 
 const RINGS = {
-  saturn: { inner: 1.25, outer: 2.3, opacity: 1 },
-  uranus: { inner: 1.6, outer: 2, opacity: 0.22 },
-  neptune: { inner: 1.7, outer: 2.5, opacity: 0.1 },
+  saturn: { inner: 1.235, outer: 2.335, opacity: 1 },
+  uranus: { inner: 1.62, outer: 2.02, opacity: 0.85 },
+  neptune: { inner: 1.6, outer: 2.6, opacity: 0.45 },
   jupiter: { inner: 1.4, outer: 1.8, opacity: 0.06 },
   haumea: { inner: 1.6, outer: 1.85, opacity: 0.3 },
 }

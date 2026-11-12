@@ -1,4 +1,5 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import Starfield from '../components/3d/Starfield.jsx'
 import Nebula from '../components/3d/Nebula.jsx'
@@ -7,9 +8,23 @@ import CameraRig from '../components/3d/CameraRig.jsx'
 import SceneLights from '../components/3d/SceneLights.jsx'
 import SolarSystem from '../components/3d/SolarSystem.jsx'
 import FlightControls from '../components/3d/FlightControls.jsx'
+import Meteors from '../components/3d/Meteors.jsx'
+import DeepSky from '../components/3d/DeepSky.jsx'
+import { useEffects } from '../lib/effects.js'
+import { setSimulation, tickClock } from '../lib/simClock.js'
 import { framingRadius } from '../lib/cameraFraming.js'
 
 const SYSTEM_PHASES = new Set(['entering', 'universe', 'exiting'])
+
+/** Advances the shared simulation clock once per frame, before its readers. */
+function ClockDriver({ reducedMotion }) {
+  // Reduced motion starts paused; the visitor can still press play.
+  useEffect(() => {
+    if (reducedMotion) setSimulation({ playing: false })
+  }, [reducedMotion])
+  useFrame((state, delta) => tickClock(delta, state.clock.elapsedTime), -1)
+  return null
+}
 
 /**
  * The deep-space backdrop (Phase 2) plus the solar system (Phase 3), and
@@ -38,6 +53,7 @@ export default function SolarScene({
   onFlightSettled,
 }) {
   const motion = reducedMotion ? 0 : 1
+  const effects = useEffects()
   const isUniverse = phase === 'universe'
   const flying = mode === 'flight' && isUniverse
 
@@ -52,6 +68,7 @@ export default function SolarScene({
 
   return (
     <>
+      <ClockDriver reducedMotion={reducedMotion} />
       <CameraRig
         phase={phase}
         reducedMotion={reducedMotion}
@@ -94,6 +111,12 @@ export default function SolarScene({
 
       <Debris count={170} motion={motion} />
 
+      {/* Illustrative layers: distant galaxies, dust, the odd far-off
+          transient, and shooting stars. Meteors are pure motion, so reduced
+          motion leaves them out entirely. */}
+      <DeepSky motion={motion} events={effects.events} />
+      {effects.meteors && !reducedMotion && <Meteors />}
+
       {SYSTEM_PHASES.has(phase) && (
         <SolarSystem
           phase={phase}
@@ -117,7 +140,8 @@ export default function SolarScene({
           enablePan={!focused}
           panSpeed={0.6}
           screenSpacePanning
-          minDistance={focused ? framingRadius(selectedId) * 1.6 : 3.2}
+          // Floored so a small spacecraft can never be zoomed into the near plane.
+          minDistance={focused ? Math.max(framingRadius(selectedId) * 1.6, 0.16) : 3.2}
           maxDistance={90}
           // A slow drift around each tour stop, unless the visitor prefers
           // reduced motion or has paused the tour.

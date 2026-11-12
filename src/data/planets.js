@@ -189,7 +189,8 @@ export const PLANETS = [
       tilt: 26.7,
       phase: 3.4,
       palette: ['#cbab6e', '#f4e6c4', '#9a7b47'],
-      ring: { inner: 1.35, outer: 2.3 },
+      // Real ring radii in planet radii (C ring inner edge to F ring).
+      ring: { inner: 1.235, outer: 2.335, profile: 'saturn' },
     },
     facts: {
       description:
@@ -214,6 +215,8 @@ export const PLANETS = [
       rotationSpeed: -0.59,
       tilt: 97.8,
       phase: 0.9,
+      // Narrow, dark rings: drawn faintly and ignored when framing the camera.
+      ring: { inner: 1.62, outer: 2.02, profile: 'uranus', faint: true, opacity: 0.85 },
       palette: ['#7ec6cf', '#cdeef2', '#4f9aa6'],
     },
     facts: {
@@ -239,6 +242,7 @@ export const PLANETS = [
       rotationSpeed: 0.604,
       tilt: 28.3,
       phase: 2.7,
+      ring: { inner: 1.6, outer: 2.6, profile: 'neptune', faint: true, opacity: 0.45 },
       palette: ['#2b4fae', '#7fa3e8', '#15306e'],
       spot: { lat: -0.3, lon: 4.0, size: 0.11, color: '#16255c' },
     },

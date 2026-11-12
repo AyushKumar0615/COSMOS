@@ -3,7 +3,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { MISSIONS, AGENCIES, MISSION_TYPES, STATUS_LABELS } from '../src/data/missions.js'
-import { BODY_ORDER, PLANETS } from '../src/data/planets.js'
+import { BODY_ORDER, PLANETS, PLANETS_BY_ID, SUN } from '../src/data/planets.js'
+import { SATELLITES, SATELLITE_FACT_FIELDS, isProbe } from '../src/data/satellites.js'
+import { probeDistances, probeJd, trajectoryPeriod, trajectoryPosition, trajectoryRange, TRAJECTORY_RETRIEVED } from '../src/lib/trajectories.js'
+import { MOONS, SMALL_BODIES, radiusFromAu } from '../src/data/solarBodies.js'
+import { SOLAR_BODIES, SOLAR_BODIES_BY_ID } from '../src/data/solarNames.js'
+import orbitsData from '../src/data/catalogue/orbits.json' with { type: 'json' }
+import trajectoriesData from '../src/data/catalogue/trajectories.json' with { type: 'json' }
+import { eclipseState, julianDate, moonPosition, planetPosition, solveKepler } from '../src/lib/orbits.js'
+import { EFFECT_DEFAULTS } from '../src/lib/effects.js'
 import { GALAXIES } from '../src/data/galaxies.js'
 import { NEBULAE } from '../src/data/nebulae.js'
 import { TOUR_STOPS } from '../src/data/tour.js'
@@ -129,6 +137,157 @@ test('life cycle: paths end in the right remnant', () => {
   assert.equal(last('massive'), 'neutron')
   assert.equal(last('giant'), 'hole')
   for (const path of Object.values(LIFE_PATHS)) assert.equal(path.stages[0].id, 'cloud')
+})
+
+test('spacecraft: sourced facts, real ordering, and a truly geostationary orbit', () => {
+  const ids = new Set(SATELLITES.map((craft) => craft.id))
+  assert.equal(ids.size, SATELLITES.length)
+  for (const craft of SATELLITES) {
+    assert.ok(craft.facts.description.length > 60, `${craft.id} description`)
+    assert.ok(craft.facts.orbit, `${craft.id} orbit`)
+    for (const key of Object.keys(craft.facts)) {
+      assert.ok(key === 'description' || SATELLITE_FACT_FIELDS.some((field) => field.key === key), `${craft.id}.${key} is shown`)
+    }
+    if (craft.trajectory) assert.ok(trajectoryRange(craft.trajectory), `${craft.id} has a Horizons track`)
+    if (isProbe(craft)) continue
+    assert.ok(PLANETS_BY_ID[craft.host], `${craft.id} host`)
+    assert.ok(craft.sim.radius > 1.1, `${craft.id} clears the planet and its atmosphere`)
+  }
+  const period = (id) => SATELLITES.find((craft) => craft.id === id).sim.period
+  // Lower orbits are faster, as Kepler's third law requires.
+  assert.ok(period('tiangong') <= period('iss') && period('iss') < period('hubble'))
+  assert.ok(period('hubble') < period('gps') && period('gps') < period('geo-comms'))
+  const earthDay = (2 * Math.PI) / PLANETS_BY_ID.earth.sim.rotationSpeed
+  assert.ok(Math.abs(period('geo-comms') - earthDay) < 1e-9, 'geostationary keeps pace with the planet')
+  assert.equal(SATELLITES.find((craft) => craft.id === 'hubble').facts.inclination, '28.5°')
+  assert.equal(SATELLITES.find((craft) => craft.id === 'iss').facts.inclination, '51.6°')
+})
+
+test('probes: Horizons tracks interpolate smoothly and stay outside the drawn Sun', () => {
+  const retrieved = julianDate(Date.parse(`${TRAJECTORY_RETRIEVED}T00:00:00Z`))
+  for (const craft of SATELLITES.filter(isProbe)) {
+    const [start, end] = trajectoryRange(craft.trajectory)
+    assert.ok(start <= retrieved && retrieved <= end, `${craft.id} covers the retrieval date`)
+    assert.equal(trajectoryPosition(craft.trajectory, end + 1), null, `${craft.id} has no invented positions`)
+  }
+  // Voyager 1 is beyond 160 AU and over 22 light-hours away from 2025 on.
+  const v1 = probeDistances('voyager-1', retrieved)
+  assert.ok(v1.sun > 160 && v1.lightHours > 22, `Voyager 1 at ${v1.sun} AU`)
+  // Parker: perihelion 9.86 solar radii (0.0459 AU) every ~88 days, found
+  // between daily samples by the two-body fit rather than cut through, and
+  // the fit stays on the samples elsewhere.
+  for (const [jd, x, y, z] of trajectoriesData.spacecraft['parker-solar-probe'].samples.slice(0, -1)) {
+    const p = trajectoryPosition('parker-solar-probe', jd + 1e-9)
+    assert.ok(Math.hypot(p[0] - x, p[1] - y, p[2] - z) < 0.003, `Parker fit at ${jd}`)
+  }
+  const [start] = trajectoryRange('parker-solar-probe')
+  const period = trajectoryPeriod('parker-solar-probe')
+  assert.ok(Math.abs(period - 88) < 1.5, `period ${period}`)
+  let closest = Infinity
+  for (let jd = start; jd < start + period; jd += 0.02) {
+    const p = trajectoryPosition('parker-solar-probe', jd)
+    closest = Math.min(closest, Math.hypot(p[0], p[1], p[2]))
+  }
+  assert.ok(Math.abs(closest - 0.0459) < 0.001, `perihelion ${closest} AU`)
+  assert.ok(radiusFromAu(closest) > SUN.sim.radius * 1.4, 'drawn clear of the Sun')
+  // Educational mode loops Parker through whole orbits and keeps the far probes still.
+  const loopJd = probeJd('parker-solar-probe', { mode: 'educational', jd: 0, t: 1e6 }, retrieved, true)
+  assert.ok(loopJd >= start && loopJd <= trajectoryRange('parker-solar-probe')[1])
+  assert.equal(probeJd('voyager-1', { mode: 'educational', jd: 0, t: 1e6 }, retrieved, false), retrieved)
+  // The distance map keeps every distance in order.
+  let previous = -1
+  for (const au of [0.0047, 0.0459, 0.39, 1, 5.2, 30, 66, 172]) {
+    assert.ok(radiusFromAu(au) > previous, `monotonic at ${au} AU`)
+    previous = radiusFromAu(au)
+  }
+})
+
+test('orbits: Kepler solver, Earth at its known places, and eclipses on the right dates', () => {
+  // Kepler's equation holds even for Hale-Bopp's near-parabolic orbit.
+  for (const e of [0, 0.0167, 0.2056, 0.967, 0.995]) {
+    for (let M = -3; M <= 3; M += 0.25) {
+      const E = solveKepler(M, e)
+      assert.ok(Math.abs(E - e * Math.sin(E) - M) < 1e-9, `e=${e} M=${M}`)
+    }
+  }
+  // Earth: about 0.983 AU at January perihelion, 1.017 AU at July aphelion,
+  // and the Sun at the March equinox, which in JPL's fixed J2000 frame sits
+  // behind 0° by the precession since 2000 (50.29″ a year: 0.369° by 2026).
+  const earth = orbitsData.planets.earth
+  const r = (iso) => Math.hypot(...planetPosition(earth, julianDate(Date.parse(iso))))
+  assert.ok(Math.abs(r('2026-01-03T17:00Z') - 0.9833) < 0.001)
+  assert.ok(Math.abs(r('2026-07-06T18:00Z') - 1.0166) < 0.001)
+  const eq = planetPosition(earth, julianDate(Date.parse('2026-03-20T14:46Z')))
+  const sunLon = (Math.atan2(-eq[1], -eq[0]) * 180) / Math.PI
+  const precession = (50.29 * (2026.21 - 2000)) / 3600
+  assert.ok(Math.abs(sunLon + precession) < 0.05, `Sun longitude at equinox ${sunLon}`)
+
+  // Eclipses: the geometry should find each within ±3 hours of its maximum,
+  // and nothing at new and full moons outside eclipse season.
+  const moon = orbitsData.moons.moon
+  const AU_KM = 149597870.7
+  const around = (iso) => {
+    const found = new Set()
+    for (let h = -3; h <= 3; h += 0.25) {
+      const jd = julianDate(Date.parse(iso)) + h / 24
+      const e = planetPosition(earth, jd)
+      const d = Math.hypot(...e)
+      const rel = moonPosition(moon, moon.orbitKm, moon.eccentricity, jd, [0, 0, 0], earth)
+      const s = eclipseState(rel, e.map((v) => -v / d), d * AU_KM, earth.radiusKm, moon.radiusKm)
+      if (s.solar) found.add('solar')
+      if (s.lunar) found.add(s.lunar)
+    }
+    return found
+  }
+  for (const iso of ['2024-04-08T18:17Z', '2024-10-02T18:45Z', '2025-03-29T10:47Z', '2025-09-21T19:41Z', '2026-02-17T12:12Z', '2026-08-12T17:46Z']) {
+    assert.ok(around(iso).has('solar'), `solar eclipse ${iso}`)
+  }
+  for (const iso of ['2025-03-14T06:58Z', '2025-09-07T18:11Z', '2026-03-03T11:33Z']) assert.ok(around(iso).has('total'), `total lunar eclipse ${iso}`)
+  for (const iso of ['2024-03-25T07:13Z', '2024-09-18T02:44Z', '2026-08-28T04:12Z']) assert.ok(around(iso).size > 0, `lunar eclipse ${iso}`)
+  for (const iso of ['2024-06-06T12:38Z', '2024-06-22T01:08Z', '2025-06-25T10:31Z', '2025-07-10T20:37Z']) {
+    assert.equal(around(iso).size, 0, `no eclipse at ${iso}`)
+  }
+})
+
+test('moons and small bodies: JPL data present, named, and drawn in their real order', () => {
+  for (const moon of MOONS) {
+    const el = moon.elements
+    assert.ok(SOLAR_BODIES_BY_ID[moon.id]?.kind === 'moon', `${moon.id} is named`)
+    assert.ok(el.orbitKm > 0 && el.radiusKm > 0 && el.periodDays > 0, `${moon.id} JPL values`)
+    assert.equal(moon.retrograde, el.i > 90, `${moon.id} direction`)
+  }
+  // Around each planet, a farther moon is drawn farther out and goes round more slowly.
+  const hosts = new Set(MOONS.map((m) => m.host))
+  for (const host of hosts) {
+    const moons = MOONS.filter((m) => m.host === host).sort((a, b) => a.elements.orbitKm - b.elements.orbitKm)
+    for (let k = 1; k < moons.length; k += 1) {
+      assert.ok(moons[k].sim.orbit > moons[k - 1].sim.orbit, `${moons[k].id} beyond ${moons[k - 1].id}`)
+      assert.ok(moons[k].sim.period > moons[k - 1].sim.period, `${moons[k].id} slower than ${moons[k - 1].id}`)
+    }
+  }
+  // Every named body has data, and every body with data has a name.
+  const withData = new Set([...MOONS.map((m) => m.id), ...SMALL_BODIES.map((b) => b.id), 'charon'])
+  for (const body of SOLAR_BODIES) assert.ok(withData.has(body.id), `${body.id} has data`)
+  for (const id of withData) assert.ok(SOLAR_BODIES_BY_ID[id], `${id} has a name`)
+  // Comets: perihelion inside aphelion, and Halley about 76 years.
+  for (const body of SMALL_BODIES) assert.ok(body.elements.q < (body.elements.Q ?? Infinity), `${body.id} q < Q`)
+  const halley = SMALL_BODIES.find((b) => b.id === 'halley').elements
+  assert.ok(Math.abs(halley.periodDays / 365.25 - 76) < 2)
+})
+
+test("rings: Saturn's divisions sit at their real radii, and only Saturn frames by its rings", () => {
+  const saturn = PLANETS_BY_ID.saturn.sim.ring
+  // C ring inner edge 74,658 km and F ring 140,180 km over a 60,268 km radius.
+  assert.ok(saturn.inner <= 74658 / 60268 && saturn.outer >= 140180 / 60268)
+  assert.ok(!saturn.faint)
+  assert.ok(PLANETS_BY_ID.uranus.sim.ring.faint && PLANETS_BY_ID.neptune.sim.ring.faint)
+  // Uranus's epsilon ring (51,149 km) lies inside the texture's span.
+  assert.ok(PLANETS_BY_ID.uranus.sim.ring.outer > 51149 / 25559)
+})
+
+test('effects: every switch has a default and intensity is in range', () => {
+  assert.deepEqual(Object.keys(EFFECT_DEFAULTS).sort(), ['auroras', 'events', 'intensity', 'meteors', 'orbits', 'satellites'])
+  assert.ok(EFFECT_DEFAULTS.intensity > 0 && EFFECT_DEFAULTS.intensity <= 1.5)
 })
 
 test('physics: Schwarzschild figures match known values', () => {

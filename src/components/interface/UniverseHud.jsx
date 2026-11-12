@@ -3,6 +3,16 @@ import PlanetSelector from './PlanetSelector.jsx'
 import PlanetPanel from './PlanetPanel.jsx'
 import ViewControls from './ViewControls.jsx'
 import FocusTitle from './FocusTitle.jsx'
+import SatellitePanel from './SatellitePanel.jsx'
+import EffectsPanel from './EffectsPanel.jsx'
+import { isSatellite } from '../../data/satellites.js'
+import { isSolarBody } from '../../data/solarNames.js'
+import TimePanel, { EventBanner } from './TimePanel.jsx'
+import FindPanel from './FindPanel.jsx'
+import { Suspense, lazy } from 'react'
+
+// Moon, dwarf planet, asteroid and comet facts load on first use.
+const BodyPanel = lazy(() => import('./BodyPanel.jsx'))
 
 /**
  * Overlay for the solar system. Layout, desktop:
@@ -35,11 +45,11 @@ export default function UniverseHud({
       exit={{ opacity: 0 }}
       transition={transition}
     >
-      <div className="pointer-events-auto absolute left-4 top-20 sm:left-6 sm:top-24 lg:left-10">
+      <div className="pointer-events-none absolute left-4 top-20 z-30 flex items-start gap-3 sm:left-6 sm:top-24 lg:left-10">
         <button
           type="button"
           onClick={onExit}
-          className="group glass flex items-center gap-3 rounded-full py-2.5 pl-4 pr-5 transition-colors duration-300 hover:border-white/20"
+          className="group glass pointer-events-auto flex items-center gap-3 rounded-full py-2.5 pl-4 pr-5 transition-colors duration-300 hover:border-white/20"
         >
           <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
             <path
@@ -55,6 +65,9 @@ export default function UniverseHud({
             Exit
           </span>
         </button>
+        <EffectsPanel onSelect={onSelect} reducedMotion={reducedMotion} />
+        <FindPanel onSelect={onSelect} reducedMotion={reducedMotion} />
+        <TimePanel reducedMotion={reducedMotion} />
       </div>
 
       {!selectedId && (
@@ -73,6 +86,8 @@ export default function UniverseHud({
 
       <FocusTitle bodyId={selectedId} reducedMotion={reducedMotion} />
 
+      <EventBanner reducedMotion={reducedMotion} />
+
       <AnimatePresence>
         {!selectedId && (
           <motion.p
@@ -89,7 +104,21 @@ export default function UniverseHud({
       </AnimatePresence>
 
       <AnimatePresence>
-        {selectedId && (
+        {selectedId && isSatellite(selectedId) && (
+          <SatellitePanel
+            key="satellite-panel"
+            satelliteId={selectedId}
+            onClose={onClearSelection}
+            onSelect={onSelect}
+            reducedMotion={reducedMotion}
+          />
+        )}
+        {selectedId && isSolarBody(selectedId) && (
+          <Suspense key="body-panel" fallback={null}>
+            <BodyPanel bodyId={selectedId} onClose={onClearSelection} onSelect={onSelect} reducedMotion={reducedMotion} />
+          </Suspense>
+        )}
+        {selectedId && !isSatellite(selectedId) && !isSolarBody(selectedId) && (
           <PlanetPanel
             key="panel"
             bodyId={selectedId}

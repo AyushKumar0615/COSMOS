@@ -22,6 +22,9 @@ import HudFrame from './components/interface/HudFrame.jsx'
 import SystemTransition from './components/interface/SystemTransition.jsx'
 import TravelOverlay from './components/interface/TravelOverlay.jsx'
 import { BODY_ORDER } from './data/planets.js'
+import { SATELLITES, isSatellite } from './data/satellites.js'
+import { SOLAR_BODIES, SOLAR_BODIES_BY_ID } from './data/solarNames.js'
+import { useEffects } from './lib/effects.js'
 import { TOUR_DWELL_SECONDS, TOUR_INDEX_BY_BODY, TOUR_STOPS } from './data/tour.js'
 import { BLACK_HOLE_IDS, GALAXY_IDS, NEBULA_IDS, PHENOMENON_IDS } from './data/navigation.js'
 import { FLIGHT_SPEED } from './data/flight.js'
@@ -105,7 +108,10 @@ export default function App() {
 
   // Solar system selection and one-shot camera requests. The nonce makes
   // repeated identical commands distinct.
-  const [selectedId, setSelectedId] = useState(null)
+  const [rawSelectedId, setSelectedId] = useState(null)
+  // A spacecraft stops being selectable the moment spacecraft are switched off.
+  const effects = useEffects()
+  const selectedId = !effects.satellites && isSatellite(rawSelectedId) ? null : rawSelectedId
   const [cameraCommand, setCameraCommand] = useState(null)
 
   // `visit` changes on every stop change; `arrived` records the last visit
@@ -541,7 +547,17 @@ export default function App() {
       else if (scene === 'galaxies') setGalaxyId((id) => cycle(GALAXY_IDS, id, step))
       else if (scene === 'nebulae') setNebulaId((id) => cycle(NEBULA_IDS, id, step))
       else if (mode === 'tour') (step > 0 ? nextStop : prevStop)()
-      else if (mode === 'explore') {
+      else if (mode === 'explore' && SOLAR_BODIES_BY_ID[selectedId]) {
+        // Arrows step through the same kind: a planet's moons, or the comets.
+        const body = SOLAR_BODIES_BY_ID[selectedId]
+        const peers = SOLAR_BODIES.filter((b) => (body.kind === 'moon' ? b.kind === 'moon' && b.host === body.host : b.kind === body.kind))
+        const index = peers.indexOf(body)
+        setSelectedId(peers[(index + step + peers.length) % peers.length].id)
+      } else if (mode === 'explore' && isSatellite(selectedId)) {
+        // Arrows step through the spacecraft, as the panel's own buttons do.
+        const index = SATELLITES.findIndex((craft) => craft.id === selectedId)
+        setSelectedId(SATELLITES[(index + step + SATELLITES.length) % SATELLITES.length].id)
+      } else if (mode === 'explore') {
         const index = selectedId ? BODY_ORDER.indexOf(selectedId) : step > 0 ? -1 : 0
         setSelectedId(BODY_ORDER[(index + step + BODY_ORDER.length) % BODY_ORDER.length])
       }

@@ -61,6 +61,7 @@ function addPlanetShadow(material, sun) {
         `#include <common>
          varying vec3 vRingWorld;
          varying vec3 vPlanetCenter;
+         varying vec3 vRingNormal;
          varying float vPlanetRadius;`,
       )
       .replace(
@@ -68,6 +69,7 @@ function addPlanetShadow(material, sun) {
         `#include <project_vertex>
          vRingWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
          vPlanetCenter = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+         vRingNormal = normalize((modelMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
          vPlanetRadius = length((modelMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz);`,
       )
     shader.fragmentShader = shader.fragmentShader
@@ -77,6 +79,7 @@ function addPlanetShadow(material, sun) {
          uniform vec3 uSun;
          varying vec3 vRingWorld;
          varying vec3 vPlanetCenter;
+         varying vec3 vRingNormal;
          varying float vPlanetRadius;`,
       )
       .replace(
@@ -90,7 +93,12 @@ function addPlanetShadow(material, sun) {
            float miss = length(toCenter - toSun * along);
            lit = smoothstep(vPlanetRadius * 0.99, vPlanetRadius * 1.08, miss);
          }
-         diffuseColor.rgb *= mix(0.22, 1.0, lit);`,
+         diffuseColor.rgb *= mix(0.22, 1.0, lit);
+         // Seen from the face the Sun is not shining on, a ring is lit only
+         // by light leaking through it: dense parts go dark, sparse ones glow.
+         float sunSide = dot(uSun - vPlanetCenter, vRingNormal);
+         float viewSide = dot(cameraPosition - vPlanetCenter, vRingNormal);
+         if (sunSide * viewSide < 0.0) diffuseColor.rgb *= mix(0.95, 0.32, diffuseColor.a);`,
       )
   }
   // Two materials with different patches must not share a compiled program.

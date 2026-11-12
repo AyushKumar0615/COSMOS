@@ -7,6 +7,9 @@ import {
   FACT_FIELDS,
   PLANETS,
 } from '../../data/planets.js'
+import { SATELLITES } from '../../data/satellites.js'
+import { useEffects } from '../../lib/effects.js'
+import { SOLAR_BODIES } from '../../data/solarNames.js'
 
 function NavButton({ direction, body, onClick }) {
   const isPrev = direction === 'prev'
@@ -55,6 +58,9 @@ export default function PlanetPanel({ bodyId, onClose, onSelect, reducedMotion }
   const prev = BODIES_BY_ID[BODY_ORDER[(index - 1 + BODY_ORDER.length) % BODY_ORDER.length]]
   const next = BODIES_BY_ID[BODY_ORDER[(index + 1) % BODY_ORDER.length]]
   const planetNumber = PLANETS.findIndex((p) => p.id === bodyId) + 1
+  const effects = useEffects()
+  const spacecraft = effects.satellites ? SATELLITES.filter((craft) => craft.host === bodyId) : []
+  const moons = SOLAR_BODIES.filter((b) => b.kind === 'moon' && b.host === bodyId)
 
   const transition = { duration: reducedMotion ? 0 : 0.55, ease: [0.22, 1, 0.36, 1] }
 
@@ -126,6 +132,42 @@ export default function PlanetPanel({ bodyId, onClose, onSelect, reducedMotion }
               </div>
             ))}
           </dl>
+
+          {moons.length > 0 && (
+            <div className="mt-5">
+              <p className="readout opacity-60">Moons shown</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {moons.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => onSelect(m.id)}
+                    className="rounded-full border border-white/12 px-3 py-1.5 text-[0.75rem] font-light text-ink-dim transition-colors hover:border-cyan/40 hover:text-ink"
+                  >
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {spacecraft.length > 0 && (
+            <div className="mt-5">
+              <p className="readout opacity-60">Spacecraft here</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {spacecraft.map((craft) => (
+                  <button
+                    key={craft.id}
+                    type="button"
+                    onClick={() => onSelect(craft.id)}
+                    className="rounded-full border border-white/12 px-3 py-1.5 text-[0.75rem] font-light text-ink-dim transition-colors hover:border-cyan/40 hover:text-ink"
+                  >
+                    {craft.short}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <p className="mt-5 text-[0.6875rem] font-light leading-relaxed text-muted">
             {DATA_SOURCES.physical} · moon counts {DATA_SOURCES.moonsAsOf} ·

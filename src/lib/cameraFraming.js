@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import { BODIES_BY_ID, SYSTEM_EXTENT } from '../data/planets.js'
+import { SATELLITES_BY_ID } from '../data/satellites.js'
+import { extraFramingRadius } from '../data/solarBodies.js'
 
 const OVERVIEW_ELEVATION = THREE.MathUtils.degToRad(28)
 const FOCUS_FILL = 0.38
@@ -14,10 +16,16 @@ function halfFovTangents(camera) {
  * rings rather than its globe, and the Sun by part of its corona.
  */
 export function framingRadius(id) {
+  // A spacecraft is framed with room around it, so its planet shows behind.
+  const craft = SATELLITES_BY_ID[id]
+  if (craft) return craft.sim.size * 1.4
+  // Moons, dwarf planets, asteroids and comets: a little room around them.
+  const extra = extraFramingRadius(id)
+  if (extra != null) return Math.max(extra * 1.3, 0.05)
   const body = BODIES_BY_ID[id]
   if (!body) return 1
   const { radius, ring } = body.sim
-  if (ring) return radius * ring.outer * 0.9
+  if (ring && !ring.faint) return radius * ring.outer * 0.9
   if (id === 'sun') return radius * 1.3
   return radius
 }

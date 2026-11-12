@@ -1,11 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import gsap from '../../lib/gsapConfig.js'
 import Sun from './Sun.jsx'
 import Planet from './Planet.jsx'
 import OrbitPaths from './OrbitPaths.jsx'
+import Satellites from './Satellites.jsx'
 import { PLANETS } from '../../data/planets.js'
 import { getPlanetTextures } from '../../lib/planetTextures.js'
+import { useEffects } from '../../lib/effects.js'
+
+// Moons, dwarf planets, belts and comets: fetched once the system is entered.
+const SolarExtras = lazy(() => import('./SolarExtras.jsx'))
+// Voyager, New Horizons and Parker, placed from JPL Horizons ephemerides.
+const Probes = lazy(() => import('./Probes.jsx'))
 
 const COLLAPSED = 0.015
 
@@ -30,6 +37,19 @@ export default function SolarSystem({
   const gl = useThree((state) => state.gl)
   const textures = useMemo(() => getPlanetTextures(gl), [gl])
   const [hoveredId, setHoveredId] = useState(null)
+  const effects = useEffects()
+
+  // Planets register with the camera rig and, here, with the spacecraft
+  // that follow them round their orbits.
+  const hosts = useRef(new Map())
+  const registerPlanet = useCallback(
+    (id, node) => {
+      if (node) hosts.current.set(id, node)
+      else hosts.current.delete(id)
+      onRegister(id, node)
+    },
+    [onRegister],
+  )
 
   const groupRef = useRef(null)
   // Captured once: the group's starting scale must not be re-applied on
@@ -83,10 +103,37 @@ export default function SolarSystem({
           hovered={hoveredId === planet.id}
           onSelect={onSelect}
           onHover={setHoveredId}
-          onRegister={onRegister}
+          onRegister={registerPlanet}
           reducedMotion={reducedMotion}
         />
       ))}
+
+      <Suspense fallback={null}>
+        <SolarExtras
+          hosts={hosts}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onRegister={onRegister}
+          showOrbits={effects.orbits}
+        />
+      </Suspense>
+
+      {effects.satellites && (
+        <Suspense fallback={null}>
+          <Probes selectedId={selectedId} showTracks={effects.orbits} onSelect={onSelect} onRegister={onRegister} />
+        </Suspense>
+      )}
+
+      {effects.satellites && (
+        <Satellites
+          hosts={hosts}
+          selectedId={selectedId}
+          showOrbits={effects.orbits}
+          onSelect={onSelect}
+          onRegister={onRegister}
+          reducedMotion={reducedMotion}
+        />
+      )}
     </group>
   )
 }

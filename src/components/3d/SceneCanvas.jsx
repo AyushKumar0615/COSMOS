@@ -51,11 +51,23 @@ export default function SceneCanvas({ onError, onBackgroundClick, ...sceneProps 
   const contextTimer = useRef(null)
   useEffect(() => () => window.clearTimeout(contextTimer.current), [])
 
+  // Stop rendering outright while the tab is hidden. Browsers already pause
+  // animation frames for background tabs; this also covers embedded and
+  // partially throttled cases, and every animation clamps its time step, so
+  // nothing jumps when the tab returns.
+  const [visible, setVisible] = useState(() => typeof document === 'undefined' || !document.hidden)
+  useEffect(() => {
+    const onChange = () => setVisible(!document.hidden)
+    document.addEventListener('visibilitychange', onChange)
+    return () => document.removeEventListener('visibilitychange', onChange)
+  }, [])
+
   return (
     <SceneErrorBoundary onError={onError}>
       <Canvas
         className="absolute inset-0"
         dpr={dpr}
+        frameloop={visible ? 'always' : 'never'}
         gl={{
           // On for Phase 3: orbit lines and planet limbs alias badly without
           // it on 1x displays. MSAA is a hardware resolve, not post-processing.
