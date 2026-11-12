@@ -31,9 +31,78 @@ built from seeded noise. There are no image dependencies that can break.
 scripted intro and a single way in.
 
 **Solar system.** The Sun and all eight planets on compressed orbits,
-with procedurally generated surfaces, atmospheres, orbit paths, a debris
-belt and Saturn's rings — which take the planet's shadow, computed
-analytically rather than with a shadow map.
+with procedurally generated surfaces, atmospheres, orbit paths and a debris
+belt. Each planet is styled on its real character: cratered Mercury with
+bright rays; Venus's sheared golden cloud deck; Earth with climate belts,
+mountains, ice caps, glinting oceans, drifting cyclones that cast shadows,
+city lights on the night side and a twilight band at the terminator; Mars
+with dark provinces, shield volcanoes, a long canyon and polar caps;
+Jupiter's belts, festoons, white ovals and Great Red Spot; Saturn's north
+polar hexagon; and Neptune's dark spot with fast high cirrus. Saturn's
+rings place the C, B and A rings, the Cassini Division, the Encke and Keeler
+gaps and the F ring at their real radii, take the planet's shadow, cast
+their own banded shadow on the planet, and darken when seen from their
+unlit face. Uranus and Neptune have their own faint, narrow rings. The Sun
+has animated granulation, sunspot belts, faculae, real limb darkening,
+occasional flares and prominences at the limb, and coronal mass ejections
+leaving about half of the flares.
+
+**Moons, dwarf planets and small bodies.** Twenty moons — Earth's Moon,
+Phobos and Deimos, the four Galilean moons, seven of Saturn's, five of
+Uranus's and Triton — on JPL mean orbital elements, with their nodes and
+periapses precessing at JPL's rates. Each is tidally locked, shows phases
+from real lighting and has its own generated surface and panel of JPL
+figures with the source. Pluto and Charon orbit their shared barycentre,
+which lies outside Pluto. Ceres, Haumea, Makemake and Eris; Vesta, Pallas
+and Hygiea; the near-Earth asteroids Eros, Bennu and Apophis; and five comets
+(Halley, Encke, 67P, Swift–Tuttle, Hale–Bopp) follow JPL Small-Body Database
+elements. Comets grow a coma and two tails inside about 5 AU: a straight ion
+tail pointing directly away from the Sun and a curved dust tail lagging
+along the orbit. The asteroid belt shows the Kirkwood gaps at Jupiter's
+resonances, and the Kuiper belt its plutinos at Neptune's 3:2.
+
+**Time and real dates.** One clock drives everything that moves. Pause it,
+change speed, or switch to **Real dates**: planets, moons, comets and
+asteroids move to their computed positions for any date from 1800 to 2050,
+at an hour, day, week, month or year per second. Eclipses come from the
+real geometry, in kilometres: the Moon's shadow on Earth, Earth's shadow on
+the Moon (copper in totality), and moons' shadows crossing the giant planets.
+The model finds all twelve solar and lunar eclipses of 2024–2026 within
+three hours. A banner announces each eclipse and says whether it is computed
+for the date or a simulated alignment. Auroral ovals glow on Earth (green
+with a red fringe) and, in false colour, on Jupiter and Saturn.
+
+**Find.** Search every planet, moon, dwarf planet, asteroid, comet and
+spacecraft by name and fly to it. Arrow keys step through a body's peers.
+
+**Spacecraft.** The International Space Station, Tiangong, Hubble, a GPS III
+satellite, a geostationary communications satellite, the James Webb Space
+Telescope at Sun–Earth L2 and the Mars Reconnaissance Orbiter, as
+recognisable low-poly models with solar panels, foil, dishes and blinking
+navigation lights. Select one in the scene, from Earth's or Mars's panel, or
+from the Effects menu, and the camera flies alongside; its panel gives the
+operator, launch, orbit, altitude, inclination and period. Orbits can be
+drawn. The geostationary satellite orbits exactly once per simulated Earth
+day, so it really hangs over one spot. Juno orbits Jupiter on a compressed
+polar orbit.
+
+**Deep-space probes.** Voyager 1 and 2, New Horizons and Parker Solar Probe
+are placed for the simulated date from JPL Horizons ephemerides: real
+direction from the Sun, distance compressed like the planets'. Parker, on
+one fixed orbit since November 2024, is interpolated with a two-body fit to
+its samples, so it reaches its real closest approach of 9.9 solar radii
+every 88 days. Each probe's panel gives its distance from the Sun and from
+Earth and the radio signal time for that date, and its downloaded track can
+be drawn. Outside the downloaded span nothing is drawn and the panel says
+so. These are reconstructed and planned trajectories, not live tracking.
+
+**Visual effects.** Shooting stars with glowing heads, knotted trains that
+linger and fade, varied colours, speeds and brightnesses, and an occasional
+shower radiating from one point; drifting cosmic dust; distant galaxies
+beyond the stars; and now and then a far-off supernova-like flare that
+brightens and cools. The Effects menu switches meteors, spacecraft, orbit
+lines, auroras and distant events independently and scales their intensity; the choices
+are remembered in the browser.
 
 **Planet information.** Select any body for a panel of figures from the
 NASA Planetary Fact Sheet, with the camera framing the planet clear of
@@ -164,7 +233,9 @@ npm run lint      # oxlint
 ```
 
 `npm run catalogue` re-fetches the archive data into
-`src/data/catalogue/measured.json`. It is run by hand and the result reviewed:
+`src/data/catalogue/measured.json`, and `npm run orbits` re-fetches JPL orbital
+elements and Horizons spacecraft tracks into `src/data/catalogue/orbits.json`
+and `trajectories.json`. It is run by hand and the result reviewed:
 the site never contacts these services at runtime, and the build does not
 either.
 
@@ -180,7 +251,11 @@ already on the machine (set `CHROME_PATH` if it is somewhere unusual) over
 the DevTools Protocol, serving `dist/` with the headers from `vercel.json`.
 It walks every feature at five viewport sizes and covers keyboard and touch
 input, the catalogue, losing the GPU context, GPU memory across scene
-changes, running without WebGL, reduced motion and blocked fonts. Screenshots of every state and the performance figures land
+changes, running without WebGL, reduced motion and blocked fonts, the time
+controls driven into a real lunar eclipse, moon panels, and the Horizons
+probes. The unit tests check, among other things, the Kepler solver, Earth's
+orbit, the twelve known eclipses of 2024–2026, the moon data and the probe
+tracks. Screenshots of every state and the performance figures land
 in `tests/.output/`, which is not committed.
 
 To run the browser suite against a deployment instead of a local build, set
@@ -307,21 +382,22 @@ cosmos/
 │   │   └── missions/           explorer, detail panel, illustrations
 │   ├── scenes/
 │   │   ├── SpaceEnvironment.jsx  picks the scene for the current state
-│   │   ├── SolarScene.jsx        sun, planets, orbits, tour, flight
+│   │   ├── SolarScene.jsx        sun, planets, spacecraft, effects, tour, flight
 │   │   ├── GalaxyExplorer.jsx    lazy chunk
 │   │   ├── NebulaExplorer.jsx    lazy chunk
 │   │   ├── BlackHoleExplorer.jsx lazy chunk
 │   │   ├── PhenomenaExplorer.jsx lazy chunk
 │   │   ├── AtlasExplorer.jsx     lazy chunk: the Universe scene
 │   │   └── MissionBackdrop.jsx   starfield behind the mission pages
-│   ├── data/                   planets, tour, galaxies, nebulae, black
-│   │                           holes, phenomena, missions, navigation
+│   ├── data/                   planets, spacecraft, tour, galaxies, nebulae,
+│   │                           black holes, phenomena, missions, navigation
 │   │   └── catalogue/          archive data, notes, achievements
 │   ├── hooks/                  tour timer, media queries, crossfade, view
 │   │                           shift, telemetry, black hole missions
-│   └── lib/                    generators, texture baking, ray tracing
-│                               shaders, relativity, quality tiers
-├── scripts/                    fetches catalogue data from the archives
+│   └── lib/                    generators, texture baking, planet material,
+│                               spacecraft models, effect settings, ray
+│                               tracing shaders, relativity, quality tiers
+├── scripts/                    fetches catalogue data, JPL orbits and Horizons tracks
 ├── tests/                      site checks and browser suites, no dependencies
 ├── .env.example
 ├── vercel.json
@@ -333,7 +409,13 @@ cosmos/
 `SpaceEnvironment` chooses which scene lives inside it, so moving
 between the solar system, the galaxies and the nebulae never tears down
 the renderer — the view fades through black and the scene graph is
-swapped underneath. `App.jsx` owns the state the scenes read: the phase
+swapped underneath. In the solar system, planet surfaces are baked once on
+the GPU into a colour map and a data map (height, roughness, city lights)
+by `lib/planetTextures.js`, and `lib/planetMaterial.js` patches Three's
+standard material for night lights, cloud and ring shadows and haze.
+Meteors are one instanced mesh animated entirely in its vertex shader;
+spacecraft are merged into a few draw calls each and only drawn near their
+planet. Rendering stops while the tab is hidden. `App.jsx` owns the state the scenes read: the phase
 (loading → landing → entering → universe), the current scene, the mode
 (explore, tour, flight) and the selection.
 
@@ -493,7 +575,23 @@ as new moons are confirmed. Planet sizes, orbital distances and speeds
 are compressed for legibility; orbital speeds still follow Kepler's
 third law applied to the compressed radii, so inner planets outrun outer
 ones. Surfaces are generated, not photographed: Earth has oceans,
-continents and clouds, but not Earth's actual geography.
+continents and clouds, but not Earth's actual geography. Saturn's,
+Uranus's and Neptune's ring and gap radii come from the NASA ring fact
+sheets; the rings' brightness and colour are illustrative.
+
+**Spacecraft.** Orbit, altitude, inclination, period, operator and launch
+date come from NASA (ISS, Hubble, Webb, MRO), ESA (Hubble), GPS.gov and
+published orbital data for Tiangong, checked in November 2026; Hubble's
+altitude reflects its decay to about 470–485 km. The GPS and geostationary
+satellites are labelled as representatives of their class. Models are
+enlarged about twenty-thousand-fold and orbits compressed; orbital periods
+keep their real order through a compressed power law, and the
+geostationary period equals the simulated Earth day exactly.
+
+**Effects.** Meteors, dust, distant galaxies and distant flares are
+procedural visual effects, labelled as such in the Effects menu. Meteor
+colours follow the emission of common meteor elements, but nothing about
+their timing, numbers or positions is real.
 
 **Galaxies and nebulae.** Facts come from NASA, Hubble and ESA; where
 measurements differ, a range is given. Andromeda's description reflects
@@ -565,10 +663,29 @@ and add a `photo` field to that mission in `src/data/missions.js`.
 - Close-up views of a star are generic for its class, and binaries are drawn
   as a simple pair without orbital motion. Multiple-star systems such as
   Castor are shown as two stars.
-- Rings on Uranus, Neptune, Jupiter and Haumea are faint stand-ins that reuse
-  Saturn's ring profile.
+- Jupiter's and Haumea's rings are a generic faint dust band; Saturn,
+  Uranus and Neptune have their own ring profiles.
+- Planet surfaces are procedural, not photographic maps: Earth's continents
+  are invented. Real imagery (for example NASA's public-domain Blue Marble)
+  would need downloading and would add several megabytes.
+- Spacecraft cast no shadows and are not shadowed by their planet; Earth's
+  night side does not darken a satellite passing through it.
+- Meteors appear in open space as a visual effect; real meteors are seen
+  only in a planet's atmosphere.
+- There is no screen-wide bloom pass in the solar system: the Sun's glow is
+  layered corona sprites, which cost far less on integrated graphics.
 - The Sun's planets in the Solar System scene and in the Universe are separate
-  views. The dwarf planets and moons appear only in the Universe.
+  views.
+- Real-dates positions use JPL's low-precision elements: planets valid
+  1800–2050; the Moon's position is good to about 1°, so eclipse timing is
+  within a few hours and a very shallow partial lunar eclipse can show as
+  penumbral. Positions are in JPL's fixed J2000 frame.
+- Spacecraft tracks cover only the downloaded span (Voyagers and New Horizons
+  2024–2029, Parker June 2025–December 2027, Juno 2024–2027). Juno is drawn on
+  a compressed circular orbit, not its real elliptical one; Cassini and the
+  Mars rovers are not in the scene.
+- No on-screen labels, measuring tool or true-scale mode yet, and no asteroid
+  collision simulation.
 - Curved spacetime is an analogy, with depths compressed for comparison.
 - Wormholes are hypothetical, and the far side's grid is invented.
 - Carina's Homunculus is drawn larger than scale so it is visible, and
@@ -584,7 +701,7 @@ and add a `photo` field to that mission in `src/data/missions.js`.
   `public/fonts/`, declare them with `@font-face` in `src/index.css`,
   and drop the `<link>` tags and the font entries from the content
   security policy in `vercel.json`.
-- `npm run lint` reports no errors and about 80 warnings. Nearly all are
+- `npm run lint` reports no errors and about 100 warnings. Nearly all are
   React Compiler hints about mutating refs from frame loops and event
   handlers, and calling `Math.random` in `useMemo`, both ordinary in React
   Three Fiber code.
@@ -611,6 +728,13 @@ NASA's [Webb image of the Sombrero](https://science.nasa.gov/missions/webb/hats-
 at Harvard). ESA's Gaia archive was unavailable when the data was fetched, and
 the catalogue does not query it directly: SIMBAD's parallaxes largely derive
 from Gaia.
+
+**Solar system motion.** [JPL approximate planet positions](https://ssd.jpl.nasa.gov/planets/approx_pos.html)
+(Table 1), [JPL planetary satellite mean elements](https://ssd.jpl.nasa.gov/sats/elem/),
+the [JPL Small-Body Database](https://ssd-api.jpl.nasa.gov/doc/sbdb.html), and
+[JPL Horizons](https://ssd.jpl.nasa.gov/horizons/) for spacecraft. The Moon's
+periodic terms are the low-precision series in Meeus, *Astronomical
+Algorithms*, chapter 47. Spacecraft facts are from NASA and APL mission pages.
 
 **Phenomena.** NASA on [the neutron star in SN 1987A](https://science.nasa.gov/missions/webb/webb-finds-evidence-for-neutron-star-at-heart-of-young-supernova-remnant/);
 the [NASA Exoplanet Catalog](https://science.nasa.gov/exoplanet-catalog/) for

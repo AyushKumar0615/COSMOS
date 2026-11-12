@@ -6,7 +6,7 @@ COSMOS is an interactive 3D universe exploration website built with React, Three
 Project directory: `~/Documents/projects/COSMOS`
 
 ## Development Status
-Phases 1–8 are completed, plus the Black Hole Explorer, new destinations and the Phenomena lab. Those additions exist locally only: the private Vercel build predates them.
+Phases 1–8 are completed, plus the Black Hole Explorer, new destinations, the Phenomena lab, the realism upgrade and the overnight solar-system evolution (moons, small bodies, real dates, eclipses, Horizons probes). All of it exists locally only and is uncommitted: the private Vercel build predates it. Progress and checkpoints: `COSMOS_OVERNIGHT_PROGRESS.md`.
 
 ### Completed Features
 - Interactive landing page and universe entry.
@@ -27,10 +27,15 @@ Phases 1–8 are completed, plus the Black Hole Explorer, new destinations and t
 - Phenomena lab: supernova, pulsar, wormhole, curved spacetime, cosmic scale and exoplanets.
 - Universe atlas: GPU star map, searchable catalogue, explorable systems, compare, bookmarks and discoveries.
 - 17 galaxies, 13 nebulae, stellar life cycle in the Phenomena lab.
+- Realism upgrade: detailed procedural planets (bump/roughness/night-light data maps, cloud and ring shadows, haze), Saturn/Uranus/Neptune rings at real radii, animated Sun with granulation, sunspots, limb darkening, flares and prominences.
+- Spacecraft (ISS, Tiangong, Hubble, GPS III, GEO comsat, Webb, MRO) with panels and orbits; meteors, dust, distant galaxies and transients; Effects menu (`lib/effects.js`, saved in localStorage).
+- Solar system evolution: 20 moons, Pluto–Charon, dwarf planets, asteroids, comets, asteroid and Kuiper belts (`SolarExtras.jsx`, lazy); shared clock with real dates 1800–2050 (`lib/simClock.js`, `lib/orbits.js`, `TimePanel.jsx`); eclipses from real geometry; auroras (`Aurora.jsx`); CMEs; Find panel; body panels with JPL sources.
+- Deep-space probes from JPL Horizons (Voyager 1/2, New Horizons, Parker; `Probes.jsx`, `lib/trajectories.js`, lazy) and Juno at Jupiter. Not live tracking.
 - Automated tests: `npm test` and `npm run test:browser`.
 
 ## Data Rules
 - Measurements come from `src/data/catalogue/measured.json`, built by `npm run catalogue` from NASA, JPL and SIMBAD. Never type a measurement by hand.
+- Orbital elements and spacecraft tracks come from `src/data/catalogue/orbits.json` and `trajectories.json`, built by `npm run orbits` from JPL (Table 1, satellite elements, SBDB, Horizons). Positions are in JPL's J2000 frame.
 - Corrections go in `OVERRIDES` in `src/data/catalogue/notes.js`, with the reason.
 - Leave a missing value `null`. Never fill a gap with an estimate.
 - Keep first-load data as ids only (`src/data/navigation.js`); anything larger belongs in a lazy chunk.
@@ -39,6 +44,7 @@ Phases 1–8 are completed, plus the Black Hole Explorer, new destinations and t
 - Run `npm test` and `npm run test:browser`, then review the screenshots in `tests/.output/` by eye: the click helper scrolls elements itself, so it can pass things a real visitor cannot reach.
 - The in-app browser pane is usually hidden and throttled, so never report frame rates from it. The browser suite uses real Chrome on the GPU.
 - Label science as Observed, Inferred, Model or Theory. Do not add a figure that cannot be sourced.
+- Spacecraft facts live in `src/data/satellites.js` `facts`; `sim` values are visual only and never shown as data. Leave out a fact rather than guess it.
 
 ## Essential Rules
 1. Never rebuild existing completed functionality.
