@@ -12,6 +12,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "catalogue": "node scripts/build-catalogue.mjs",
+    "orbits": "node scripts/build-orbits.mjs",
     "test": "npm run build && node --test tests/site.test.mjs",
     "test:browser": "npm run build && node --test --test-concurrency=1 tests/browser.test.mjs",
     "preview": "vite preview"
