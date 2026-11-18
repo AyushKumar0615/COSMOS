@@ -1103,6 +1103,7 @@ test('open universe: six directions, speed, camera modes and the astronaut', { t
   await page.key('w', { hold: 1200 })
   const flying = await page.evaluate(`document.querySelector('[aria-label="Velocity"]').innerText`)
   assert.match(flying, /\d c/i, 'shows multiples of c while moving')
+  assert.match(flying, /Acceleration [\d,.]+ km\/s²/i, 'shows the acceleration while speeding up')
   await sleep(1500)
   await page.key('2')
 

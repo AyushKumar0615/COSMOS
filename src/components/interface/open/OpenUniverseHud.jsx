@@ -435,6 +435,11 @@ function Velocity({ compact, short, t, speed, cruise, settings, preset, status }
           {speed.lys && ` · ${speed.lys}`}
         </p>
       )}
+      {!compact && (
+        <p className="readout mt-0.5 tabular-nums opacity-80" data-testid="open-acceleration">
+          Acceleration {Math.abs(t?.acceleration ?? 0) < 1e-3 ? '0' : `${t.acceleration < 0 ? '−' : ''}${formatSpeed(Math.abs(t.acceleration)).kms.replace(' km/s', '')}`} km/s²
+        </p>
+      )}
       <p className="mt-1 text-[0.6875rem] font-light leading-snug text-ink-dim">{status}</p>
       <div className="hairline my-2.5 h-px w-full opacity-50" />
       <div className="flex items-baseline justify-between gap-2">

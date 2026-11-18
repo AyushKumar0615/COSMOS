@@ -687,8 +687,14 @@ function publish(L, world, view, s, target, brightest, brightestMag, outsideMw) 
 
   const heading = galacticAngles(fwd.x, fwd.y, fwd.z)
   const mw = world.byId['milky-way']
+  // Acceleration over the publish interval (speed change per second).
+  const now = performance.now()
+  const acceleration = L.lastPublish ? (ship.speed - L.lastSpeed) / Math.max((now - L.lastPublish) / 1000, 1e-3) : 0
+  L.lastPublish = now
+  L.lastSpeed = ship.speed
   publishTelemetry({
     speed: ship.speed,
+    acceleration,
     cruise,
     position: [...ship.pos],
     fromSun: Math.hypot(...ship.pos),

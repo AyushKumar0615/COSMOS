@@ -185,11 +185,28 @@ Branch `main`; local commits allowed, nothing pushed or deployed.
   landscape, reduced motion); performance 60 fps idle and in fast travel,
   heap flat (13.9 → 13.9 MB).
 
+## Cycle E–J — refinement (verified)
+
+- Full planet materials in the open universe (shader takes an optional Sun
+  direction), planets and moons oriented to the ecliptic, belts (shared
+  sampling with the solar scene), route line, acceleration readout, history
+  tab, display and sound settings with volume, interface tones, explorer
+  hand-off, touch/tablet/phone layout fixes from screenshot review.
+- Committed `68e4161` on branch `open-universe` (main untouched), then the
+  acceleration readout and the final docs.
+- Results on the final code: build passes; lint 0 errors; unit 34/34;
+  browser 38/38; 60 fps everywhere (open universe idle and travelling);
+  heap 14.0 → 13.9 MB; first contentful paint 176 ms.
+- Final report: `COSMOS_OVERNIGHT_FINAL_REPORT.md`.
+
+Next task: the first open item in `COSMOS_OVERNIGHT_TODO.md` (comet tails in
+the open universe), after the user reviews the branch.
+
 ## Resume
 
 ``` bash
 cd ~/Documents/projects/COSMOS
-git status && git log --oneline -3
+git checkout open-universe && git status && git log --oneline -3
 npm test && npm run test:browser
 ```
 Then take the first open item in COSMOS_OVERNIGHT_TODO.md.
