@@ -1,7 +1,7 @@
 # COSMOS — Overnight Infinite Universe Evolution: final report
 
-Date: 2026-11-12. Branch `main` on `e1a817e`; everything below is uncommitted,
-unpushed and undeployed. Checkpoint detail is in `COSMOS_OVERNIGHT_PROGRESS.md`.
+Date: 2026-11-12. Committed on local `main` (476c67f..8bedc09, on top of
+`e1a817e`); not pushed to GitHub or deployed. Checkpoint detail is in `COSMOS_OVERNIGHT_PROGRESS.md`.
 
 ## 1. Implemented features
 
@@ -152,14 +152,13 @@ npm run orbits         # refetch JPL elements and Horizons tracks (network)
 Ready for a private preview deployment, not yet for public launch. The build,
 unit and browser suites pass, performance is 60 fps with stable memory, and
 data is sourced and labelled. Before a public launch: test on Safari and real
-phones (the CLAUDE.md priority), review and commit the work in reviewable
-pieces, then deploy to a preview and recheck it. Nothing has been committed,
-pushed or deployed.
+phones (the CLAUDE.md priority), push, then deploy to a preview and recheck
+it. The work is committed on local `main` but not pushed or deployed.
 
 ## 10. Next steps
 
-1. Review `git diff` and commit in logical pieces (realism upgrade; orbital
-   data and clock; moons and small bodies; phenomena; probes; fixes and tests).
+1. Done: committed in four pieces (476c67f..8bedc09). Push with
+   `git push origin main` when approved.
 2. Deploy a preview build (not production) and run
    `COSMOS_TEST_URL=<preview> node --test --test-concurrency=1 tests/browser.test.mjs`.
 3. Test on Safari and real iOS/Android devices.

@@ -1,9 +1,8 @@
 # COSMOS overnight progress — Infinite Universe Evolution
 
-Working tree only: nothing committed, pushed or deployed. Branch `main`, on top of
-`e1a817e Initial COSMOS universe release`. The earlier realism upgrade (planets,
-Sun, spacecraft, meteors, Effects menu) is also still uncommitted and verified
-(build, 23/23 unit, 32/32 browser on 2026-11-12).
+Committed on local `main` (476c67f..8bedc09, on top of `e1a817e Initial COSMOS
+universe release`), together with the earlier realism upgrade (planets, Sun,
+spacecraft, meteors, Effects menu). Not pushed to GitHub or deployed.
 
 ## Checkpoint 1 — orbital data and simulation clock (verified by build + scripted checks)
 
@@ -146,12 +145,11 @@ Results on 2026-11-12, final code: build passes; lint 0 errors; `npm test`
 26/26; `npm run test:browser` 34/34; 60 fps in every measured scene; first
 contentful paint 324 ms; live heap 12.4 → 12.5 MB; GPU memory unchanged.
 
-The mission's task list is complete. Nothing committed, pushed or deployed.
+The mission's task list is complete. Committed afterwards; not pushed or deployed.
 
 ## Next tasks (in order)
 
-Awaiting the user's review. Suggested (needs approval): commit in logical
-pieces; deploy a preview (not production) and run the browser suite against
+Committed in four pieces. Suggested (needs approval): push; deploy a preview (not production) and run the browser suite against
 it; test on Safari and real phones. Possible further work: on-screen labels,
 true-scale mode, Cassini's archived trajectory, measuring tool.
 
