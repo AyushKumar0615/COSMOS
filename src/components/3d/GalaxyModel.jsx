@@ -15,7 +15,7 @@ const MARKER_RING = new THREE.RingGeometry(1, 1.12, 48)
  * differentially, but at any visible speed that would wind the arms up
  * within minutes, so the rotation here is illustrative only.
  */
-export default function GalaxyModel({ galaxy, opacityRef, reducedMotion }) {
+export default function GalaxyModel({ galaxy, opacityRef, reducedMotion, followScale = false }) {
   const spinRef = useRef(null)
   const data = useMemo(() => generateGalaxy(galaxy.model), [galaxy])
   const { model } = galaxy
@@ -35,6 +35,7 @@ export default function GalaxyModel({ galaxy, opacityRef, reducedMotion }) {
           scale={model.pointScale}
           maxSize={22}
           opacityRef={opacityRef}
+          followScale={followScale}
           renderOrder={1}
         />
         <PointCloud
@@ -44,6 +45,7 @@ export default function GalaxyModel({ galaxy, opacityRef, reducedMotion }) {
           scale={model.pointScale}
           maxSize={40}
           opacityRef={opacityRef}
+          followScale={followScale}
           renderOrder={2}
         />
         <PointCloud
@@ -52,6 +54,7 @@ export default function GalaxyModel({ galaxy, opacityRef, reducedMotion }) {
           scale={model.pointScale}
           maxSize={30}
           opacityRef={opacityRef}
+          followScale={followScale}
           renderOrder={3}
         />
 

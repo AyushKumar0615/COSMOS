@@ -8,6 +8,7 @@ const NebulaExplorer = lazy(() => import('./NebulaExplorer.jsx'))
 const BlackHoleExplorer = lazy(() => import('./BlackHoleExplorer.jsx'))
 const PhenomenaExplorer = lazy(() => import('./PhenomenaExplorer.jsx'))
 const AtlasExplorer = lazy(() => import('./AtlasExplorer.jsx'))
+const OpenUniverse = lazy(() => import('./OpenUniverse.jsx'))
 
 const explorerProps = (props) => ({
   reducedMotion: props.reducedMotion,
@@ -67,6 +68,14 @@ export default function SpaceEnvironment(props) {
           reducedMotion={reducedMotion}
           viewShift={props.viewShift}
         />
+      </Suspense>
+    )
+  }
+
+  if (phase === 'universe' && scene === 'open') {
+    return (
+      <Suspense fallback={null}>
+        <OpenUniverse reducedMotion={reducedMotion} />
       </Suspense>
     )
   }

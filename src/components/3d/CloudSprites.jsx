@@ -5,6 +5,7 @@ import * as THREE from 'three'
 const vertexShader = /* glsl */ `
   uniform float uTime;
   uniform float uMotion;
+  uniform float uSizeScale;
 
   attribute vec3 aOffset;
   attribute vec2 aScale;     // x: size, y: horizontal stretch
@@ -31,7 +32,8 @@ const vertexShader = /* glsl */ `
     float angle = aRotation + spin;
     vec2 corner = position.xy;
     corner.x *= aScale.y;
-    corner = mat2(cos(angle), sin(angle), -sin(angle), cos(angle)) * corner * aScale.x;
+    float size = aScale.x * uSizeScale;
+    corner = mat2(cos(angle), sin(angle), -sin(angle), cos(angle)) * corner * size;
 
     // Billboard in view space: always faces the camera.
     viewCenter.xy += corner;
@@ -39,7 +41,7 @@ const vertexShader = /* glsl */ `
     // Fade sprites as the camera reaches them, so flying into a cloud never
     // fills the screen with one flat, oversized sprite.
     float depth = -viewCenter.z;
-    vAlpha = aAlpha * smoothstep(aScale.x * 0.2, aScale.x * 0.9, depth);
+    vAlpha = aAlpha * smoothstep(size * 0.2, size * 0.9, depth);
 
     gl_Position = projectionMatrix * viewCenter;
   }
@@ -87,8 +89,12 @@ export default function CloudSprites({
   opacityRef,
   renderOrder = 1,
   reducedMotion = false,
+  // Scale sprite sizes with the object's own world scale (the open universe
+  // draws models scaled about the camera). Off everywhere else.
+  followScale = false,
 }) {
   const materialRef = useRef(null)
+  const meshRef = useRef(null)
 
   const geometry = useMemo(() => {
     const count = sprites.length
@@ -133,6 +139,7 @@ export default function CloudSprites({
       uTime: { value: 0 },
       uMotion: { value: 1 },
       uOpacity: { value: 1 },
+      uSizeScale: { value: 1 },
     }),
     [texture],
   )
@@ -143,12 +150,13 @@ export default function CloudSprites({
     material.uniforms.uTime.value = state.clock.elapsedTime
     material.uniforms.uMotion.value = reducedMotion ? 0 : 1
     material.uniforms.uOpacity.value = opacityRef ? opacityRef.current.value : 1
+    material.uniforms.uSizeScale.value = followScale && meshRef.current ? meshRef.current.matrixWorld.getMaxScaleOnAxis() : 1
   })
 
   if (sprites.length === 0) return null
 
   return (
-    <mesh geometry={geometry} renderOrder={renderOrder} frustumCulled={false} raycast={() => null}>
+    <mesh ref={meshRef} geometry={geometry} renderOrder={renderOrder} frustumCulled={false} raycast={() => null}>
       <shaderMaterial
         ref={materialRef}
         uniforms={uniforms}

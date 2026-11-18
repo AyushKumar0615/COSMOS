@@ -383,3 +383,141 @@ test('config: vercel.json serves every public file and sends the security header
     assert.ok(keys.includes(key), key)
   }
 })
+
+// --- Open universe ----------------------------------------------------------------------
+
+const ow = await import('../src/lib/openWorld.js')
+const wc = await import('../src/lib/worldCatalogue.js')
+const { truePosition } = await import('../src/data/catalogue/index.js')
+
+test('open universe: units and readouts pick the right scale', () => {
+  assert.equal(ow.formatKm(384400), '384,400 km')
+  assert.match(ow.formatKm(2.5e6), /million km$/)
+  assert.match(ow.formatKm(ow.KM_PER_AU * 5.2), /^5\.2 AU$/)
+  assert.match(ow.formatKm(ow.KM_PER_LY * 8.6), /^8\.6 ly$/)
+  assert.match(ow.formatKm(ow.KM_PER_LY * 2.5e6), /Mpc$/)
+  assert.equal(ow.formatSpeed(ow.C_KM_S).c, '1 c')
+  assert.equal(ow.formatSpeed(0).c, '0 c')
+  assert.ok(ow.formatSpeed(ow.C_KM_S * 2).fasterThanLight)
+  assert.ok(!ow.formatSpeed(17).fasterThanLight)
+  assert.equal(ow.formatSpeed(ow.KM_PER_LY * 10).lys, '10 ly/s')
+  assert.equal(ow.formatDuration(30), '30 s')
+  assert.match(ow.formatDuration(3 * 86400 * 365.25 * 1e6), /million years/)
+  // The light-year is defined from c and the Julian year; 1 pc ≈ 3.2616 ly.
+  assert.ok(Math.abs(ow.KM_PER_PC / ow.KM_PER_LY - 3.26156) < 1e-4)
+})
+
+test('open universe: a right-handed galactic frame that agrees with the catalogue', () => {
+  // Same positions as the catalogue, with l = 90° on -Z (the catalogue's
+  // truePosition mirrors that axis; distances and the other axes agree).
+  for (const id of ['sirius', 'andromeda', 'orion', 'sgr-a', 'proxima']) {
+    const e = CATALOGUE_BY_ID[id]
+    const mine = ow.raDecToWorld(e.ra, e.dec, e.distanceLy)
+    const theirs = truePosition(e)
+    assert.ok(Math.abs(mine[0] - theirs[0]) < 1e-6 * e.distanceLy, id)
+    assert.ok(Math.abs(mine[1] - theirs[1]) < 1e-6 * e.distanceLy, id)
+    assert.ok(Math.abs(mine[2] + theirs[2]) < 1e-6 * e.distanceLy, id)
+    const { l, b } = ow.galacticAngles(...mine)
+    const g = toGalactic(e.ra, e.dec)
+    assert.ok(Math.abs(((l - (g.l + 360) % 360 + 540) % 360) - 180) < 1e-4 && Math.abs(b - g.b) < 1e-4, id)
+  }
+  // Right-handed: x × y = z for the images of the equatorial axes.
+  const x = ow.equatorialToWorld(1, 0, 0)
+  const y = ow.equatorialToWorld(0, 1, 0)
+  const z = ow.equatorialToWorld(0, 0, 1)
+  const cross = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]]
+  cross.forEach((v, i) => assert.ok(Math.abs(v - z[i]) < 1e-6))
+  // Ecliptic north pole: RA 270°, Dec 90° − obliquity.
+  const pole = ow.eclipticToWorld(0, 0, 1)
+  const expected = ow.raDecToWorld(270, 90 - 23.4392911, 1)
+  pole.forEach((v, i) => assert.ok(Math.abs(v - expected[i]) < 1e-9))
+})
+
+test('open universe: compressed rendering keeps order and true angular size', () => {
+  let last = -Infinity
+  for (let e = 0; e <= 23; e += 0.5) {
+    const r = ow.renderDistance(10 ** e)
+    assert.ok(r > last)
+    last = r
+  }
+  assert.ok(ow.renderDistance(1e23) < ow.RENDER_FAR, 'the farthest quasar fits inside the far plane')
+  // Scaling by R/d about the camera keeps the angle a radius subtends.
+  for (const [radius, d] of [[6371, 30000], [695700, 1.5e8], [5e17, 2.4e19]]) {
+    const k = ow.renderDistance(d) / d
+    assert.ok(Math.abs(Math.atan(radius / d) - Math.atan((radius * k) / (d * k))) < 1e-12)
+  }
+})
+
+test('open universe: autopilot eases in log distance and always arrives', () => {
+  const start = 2.4e19
+  const stop = 1e15
+  assert.ok(ow.autopilotDuration(start, stop) <= 22 && ow.autopilotDuration(1e5, 1e4) >= 3)
+  assert.ok(Math.abs(ow.autopilotDistance(start, stop, 0) - start) / start < 1e-12)
+  assert.ok(Math.abs(ow.autopilotDistance(start, stop, 1) - stop) / stop < 1e-12)
+  let last = Infinity
+  for (let t = 0; t <= 1.0001; t += 0.05) {
+    const d = ow.autopilotDistance(start, stop, t)
+    assert.ok(d <= last * (1 + 1e-12))
+    last = d
+  }
+})
+
+test('open universe: procedural stars are deterministic, inside the galaxy only', () => {
+  const disc = { centreLy: 26000, sunRLy: 26000, radiusLy: 50000, scaleLengthLy: 13000, scaleHeightLy: 900 }
+  const tier = { id: 0, cellLy: 25, perCell: 3, magMin: 0, magMax: 10 }
+  assert.deepEqual(ow.cellStars(4, 0, -7, tier, disc), ow.cellStars(4, 0, -7, tier, disc))
+  assert.notDeepEqual(ow.cellStars(4, 0, -7, tier, disc), ow.cellStars(5, 0, -7, tier, disc))
+  assert.equal(ow.diskDensity(26000 + 70000, 0, 0, disc), 0, 'nothing beyond the disc edge')
+  assert.ok(ow.diskDensity(0, 0, 0, disc) === 1 && ow.diskDensity(0, 3000, 0, disc) < 0.05)
+  const kept = ow.cellStars(0, 0, 0, tier, disc, () => true)
+  assert.equal(kept.length, 0, 'a keep-out rule removes stars')
+  // Magnitudes: a star at 10 pc shows its absolute magnitude.
+  const tenPc = (10 * ow.KM_PER_PC) / ow.KM_PER_LY
+  assert.ok(Math.abs(ow.apparentMagnitude(4.83, tenPc) - 4.83) < 1e-9)
+  assert.ok(Math.abs(ow.absoluteMagnitude(ow.apparentMagnitude(-1, 8.6), 8.6) + 1) < 1e-9)
+})
+
+test('open universe: every catalogued object is placed, from JPL and SIMBAD data', () => {
+  const { objects, byId } = wc.getWorld()
+  const ids = new Set()
+  for (const obj of objects) {
+    assert.ok(!ids.has(obj.id), `duplicate ${obj.id}`)
+    ids.add(obj.id)
+    assert.ok(obj.pos.every(Number.isFinite), `${obj.id} position`)
+    assert.ok(obj.radiusKm > 0 && obj.stopKm > obj.radiusKm, `${obj.id} stops outside itself`)
+    assert.ok(obj.influenceKm > 0)
+    if (['galaxy', 'nebula', 'cluster'].includes(obj.render)) assert.ok(obj.influenceKm > obj.stopKm, `${obj.id}: arriving counts as entering`)
+    // Anything not measured says so.
+    if (obj.entry && obj.render !== 'probe' && obj.entry.radiusKm == null && obj.render !== 'galaxy' && obj.render !== 'blackhole') assert.ok(obj.sizeNote, `${obj.id} model size is labelled`)
+  }
+  for (const e of CATALOGUE) if ((e.ra != null && e.distanceLy != null) || e.distanceLy === 0) assert.ok(byId[e.id] || e.type === 'exoplanet', `${e.id} missing`)
+  const d = (a, b) => Math.hypot(a.pos[0] - b.pos[0], a.pos[1] - b.pos[1], a.pos[2] - b.pos[2])
+  const sun = byId.sun
+  assert.ok(Math.abs(d(byId.earth, sun) / ow.KM_PER_AU - 1) < 0.02)
+  assert.ok(d(byId.moon, byId.earth) > 356000 && d(byId.moon, byId.earth) < 407000)
+  assert.ok(d(byId.io, byId.jupiter) > 410000 && d(byId.io, byId.jupiter) < 435000)
+  assert.ok(d(byId['voyager-1'], sun) / ow.KM_PER_AU > 160)
+  assert.ok(Math.abs(d(byId['sirius'], sun) / ow.KM_PER_LY - CATALOGUE_BY_ID.sirius.distanceLy) < 1e-6)
+  // The Milky Way is centred on Sagittarius A*, about l = 0, b = 0.
+  const centre = ow.galacticAngles(...byId['milky-way'].pos)
+  assert.ok((centre.l < 0.5 || centre.l > 359.5) && Math.abs(centre.b) < 0.5)
+  // Exoplanets sit at their measured distance from their star.
+  for (const planet of objects.filter((o) => o.type === 'exoplanet' && o.entry.semiMajorAu)) {
+    const host = byId[planet.parent]
+    assert.ok(Math.abs(Math.hypot(...planet.pos.map((v, i) => v - host.pos[i])) / ow.KM_PER_AU - planet.entry.semiMajorAu) < planet.entry.semiMajorAu * 0.01, planet.id)
+  }
+})
+
+test('open universe: real spacecraft speeds come from the Horizons tracks', () => {
+  const speeds = Object.fromEntries(wc.referenceSpeeds(Date.UTC(2026, 10, 19)).map((r) => [r.id, r.kms]))
+  assert.ok(speeds['voyager-1'] > 15 && speeds['voyager-1'] < 19, String(speeds['voyager-1']))
+  assert.ok(speeds['parker-solar-probe'] > 150 && speeds['parker-solar-probe'] < 220, String(speeds['parker-solar-probe']))
+})
+
+test('open universe: listed in the navigation, loaded lazily', () => {
+  assert.ok(NAV_ITEMS.some((item) => item.id === 'open' && item.status === 'live'))
+  const app = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8')
+  assert.match(app, /lazy\(loadOpenUniverseHud\)/)
+  const scenes = fs.readFileSync(path.join(root, 'src/scenes/SpaceEnvironment.jsx'), 'utf8')
+  assert.match(scenes, /lazy\(\(\) => import\('\.\/OpenUniverse\.jsx'\)\)/)
+})

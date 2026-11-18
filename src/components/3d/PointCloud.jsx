@@ -49,8 +49,11 @@ export default function PointCloud({
   maxSize = 40,
   opacityRef,
   renderOrder = 0,
+  // Point sizes follow the object's world scale (see CloudSprites).
+  followScale = false,
 }) {
   const materialRef = useRef(null)
+  const pointsRef = useRef(null)
   const viewport = useThree((state) => state.viewport)
 
   const geometry = useMemo(() => {
@@ -79,13 +82,13 @@ export default function PointCloud({
     const material = materialRef.current
     if (!material) return
     material.uniforms.uPixelRatio.value = Math.min(viewport.dpr, 2)
-    material.uniforms.uScale.value = scale
+    material.uniforms.uScale.value = scale * (followScale && pointsRef.current ? pointsRef.current.matrixWorld.getMaxScaleOnAxis() : 1)
     material.uniforms.uMaxSize.value = maxSize
     material.uniforms.uOpacity.value = alpha * (opacityRef ? opacityRef.current.value : 1)
   })
 
   return (
-    <points geometry={geometry} renderOrder={renderOrder} frustumCulled={false}>
+    <points ref={pointsRef} geometry={geometry} renderOrder={renderOrder} frustumCulled={false}>
       <shaderMaterial
         ref={materialRef}
         uniforms={uniforms}

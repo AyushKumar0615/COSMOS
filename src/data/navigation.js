@@ -6,6 +6,7 @@
 export const NAV_ITEMS = [
   { id: 'home', label: 'Home', status: 'live' },
   { id: 'universe', label: 'Universe', status: 'live' },
+  { id: 'open', label: 'Open Universe', short: 'Explore', status: 'live' },
   { id: 'solar-system', label: 'Solar System', short: 'Solar', status: 'live' },
   { id: 'tours', label: 'Guided Tours', short: 'Tours', status: 'live' },
   { id: 'flight', label: 'Free Flight', short: 'Flight', status: 'live' },

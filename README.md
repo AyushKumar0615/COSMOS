@@ -173,6 +173,36 @@ you can travel through, clearly marked as hypothetical; a curved spacetime
 grid where you place masses; a cosmic scale slider from Earth to the
 observable universe; and four exoplanets with their own light and surfaces.
 
+**Open universe.** One continuous space, flown in six directions, from a
+few thousand kilometres above Earth to quasars billions of light-years away,
+with no scene changes. Everything is placed in galactic coordinates from the
+catalogue: the planets, moons, dwarf planets, asteroids and comets at their
+JPL positions for today, the deep-space probes from their Horizons tracks,
+and the stars, nebulae, clusters, galaxies and black holes at their SIMBAD
+directions and distances. A floating origin keeps the camera at the centre of
+the render; each object is drawn in its true direction at a compressed depth
+and scaled to keep its true angular size, so a planet, the Orion Nebula and
+Andromeda all look as big as they really would from where you are. Nearby
+bodies switch from points of light to real meshes (planet surfaces, star
+surfaces, the galaxy and nebula models, cluster clouds); the Milky Way is a
+band in the sky from inside and the galaxy model from outside. Procedural
+field stars, generated per cell from the Milky Way model's disc, give
+parallax between the real stars; they are never named and the interface
+says they are simulated. You fly as an astronaut in an EVA suit, seen from
+behind or from inside the helmet, who leans into thrust and banks into
+turns. Cruise speed runs from 1 km/s to 10²¹ km/s on nine presets, shown in
+km/s, AU/s, multiples of light speed and light-years per second, and is
+always compared with the fastest real spacecraft, measured from the JPL
+Horizons tracks. A live HUD lists what lies within 14° of your view and
+what is nearest, with distances in km, AU, light-years or megaparsecs and
+travel times at your speed; markers follow objects on screen and hide behind
+planets; a compass gives galactic longitude and latitude, and a radar shows
+the nearest objects around you. Pick anything (from the list, a marker, a
+search or a logarithmic map of the galactic plane) and autopilot flies there
+in log distance, cancellable with any thrust. Bookmarks, saved places,
+discovery notices for every catalogued region you enter, optional generated
+cockpit sound, pause, reset, and joystick controls on touch screens.
+
 **Space missions.** Fourteen missions from NASA, ISRO, ESA and JAXA,
 each with its objective, spacecraft, discoveries, a dated status, an
 event timeline and links to the agency's own pages. Searchable and
@@ -252,10 +282,16 @@ the DevTools Protocol, serving `dist/` with the headers from `vercel.json`.
 It walks every feature at five viewport sizes and covers keyboard and touch
 input, the catalogue, losing the GPU context, GPU memory across scene
 changes, running without WebGL, reduced motion and blocked fonts, the time
-controls driven into a real lunar eclipse, moon panels, and the Horizons
-probes. The unit tests check, among other things, the Kepler solver, Earth's
-orbit, the twelve known eclipses of 2024–2026, the moon data and the probe
-tracks. Screenshots of every state and the performance figures land
+controls driven into a real lunar eclipse, moon panels, the Horizons
+probes, and the open universe (movement along each of the six axes in the
+ship's frame, speed presets, camera modes and the astronaut's orientation,
+the discovery list and markers, distances against the true geometry,
+autopilot arrival and cancelling, the map, bookmarks, touch and landscape
+layouts, reduced motion, and its frame rate and memory). The unit tests
+check, among other things, the Kepler solver, Earth's orbit, the twelve known
+eclipses of 2024–2026, the moon data, the probe tracks, and the open
+universe's units, galactic frame, compressed depth, autopilot profile,
+procedural stars and object placement. Screenshots of every state and the performance figures land
 in `tests/.output/`, which is not committed.
 
 To run the browser suite against a deployment instead of a local build, set
@@ -476,6 +512,21 @@ pauses the tour; clicking a planet jumps to its stop.
 Around a black hole, flight slows as you approach, and stops just outside
 the horizon: crossing it is left to the guided descent.
 
+### Open universe
+
+| Desktop | Touch |
+| --- | --- |
+| `W` `S`: forward / reverse thrust · `A` `D`: sideways | Joystick |
+| `Space` / `Ctrl` or `C`: up / down | Up / down buttons |
+| Drag or arrow keys: look and steer · `Q` `E`: roll | Drag anywhere |
+| *Steer with the mouse* button: pointer-lock mouse look | — |
+| `Shift`: boost ×10 | ×10 button |
+| `1`–`9`: speed presets · `+` `−`: one step · wheel: fine | − / + |
+| `T`: target what is ahead · `G`: autopilot · `X`: clear · `F`: face it | Buttons on the target bar |
+| `I`: info · `B`: bookmark · `N`: save this spot | Profile buttons |
+| `M`: map · `L`: discovery list · `V`: first / third person | Toolbar |
+| `P`: pause · `R`: reset to Earth · `H`: all keys · `Esc`: close, cancel, exit | Toolbar |
+
 ### Black holes
 
 | Input | Action |
@@ -684,8 +735,23 @@ and add a `photo` field to that mission in `src/data/missions.js`.
   2024–2029, Parker June 2025–December 2027, Juno 2024–2027). Juno is drawn on
   a compressed circular orbit, not its real elliptical one; Cassini and the
   Mars rovers are not in the scene.
-- No on-screen labels, measuring tool or true-scale mode yet, and no asteroid
-  collision simulation.
+- No measuring tool or true-scale mode yet, and no asteroid collision
+  simulation. On-screen labels exist in the open universe only.
+- Open universe: depth is compressed (directions and angular sizes are true),
+  so two objects at different distances can look closer together in depth
+  than they are. Most stars have no measured radius, so their discs are drawn
+  at a size for their class. Galaxies and nebulae keep their explorer models'
+  shape and tilt; their real orientation on the sky is not in the catalogue.
+  Exoplanets sit at their measured distance from their star, at an
+  illustrative point on the orbit. The moons of Mars, Jupiter, Saturn,
+  Uranus and Neptune have their orbit planes tilted by the planet's obliquity
+  only (the planets' pole directions are not in the data). Planets there use
+  the atlas's lighter surfaces rather than the solar scene's full materials.
+  Procedural field stars and the Milky Way band are models. Speeds above
+  light speed are a convenience, not physics, and are labelled so.
+- The atlas places stars with galactic longitude 90° on +Z, a mirror image of
+  the sky in a right-handed renderer; the open universe uses the correct
+  orientation. Distances in the atlas are unaffected.
 - Curved spacetime is an analogy, with depths compressed for comparison.
 - Wormholes are hypothetical, and the far side's grid is invented.
 - Carina's Homunculus is drawn larger than scale so it is visible, and
@@ -701,7 +767,7 @@ and add a `photo` field to that mission in `src/data/missions.js`.
   `public/fonts/`, declare them with `@font-face` in `src/index.css`,
   and drop the `<link>` tags and the font entries from the content
   security policy in `vercel.json`.
-- `npm run lint` reports no errors and about 100 warnings. Nearly all are
+- `npm run lint` reports no errors and about 130 warnings. Nearly all are
   React Compiler hints about mutating refs from frame loops and event
   handlers, and calling `Math.random` in `useMemo`, both ordinary in React
   Three Fiber code.

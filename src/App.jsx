@@ -49,6 +49,8 @@ const loadDeepSpaceLayer = () => import('./components/interface/DeepSpaceLayer.j
 const DeepSpaceLayer = lazy(loadDeepSpaceLayer)
 const loadPhenomenaHud = () => import('./components/interface/PhenomenaHud.jsx')
 const PhenomenaHud = lazy(loadPhenomenaHud)
+const loadOpenUniverseHud = () => import('./components/interface/open/OpenUniverseHud.jsx')
+const OpenUniverseHud = lazy(loadOpenUniverseHud)
 
 // loading -> landing -> entering -> universe -> exiting -> landing
 // The camera itself reports when a move has finished; these are only
@@ -70,6 +72,7 @@ const SCENE_LABELS = {
   'black-holes': 'Travelling to the black holes',
   phenomena: 'Opening the phenomena lab',
   universe: 'Opening the universe',
+  open: 'Entering the open universe',
   missions: 'Opening the mission archive',
 }
 
@@ -482,6 +485,7 @@ export default function App() {
           inSolarSystem(beginFlight)
           break
         case 'universe':
+        case 'open':
         case 'black-holes':
         case 'phenomena':
         case 'galaxies':
@@ -521,6 +525,8 @@ export default function App() {
       if (phase !== 'universe' || aboutOpen || travel) return
       const target = event.target
       if (target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return
+      // The open universe handles its own keys, Escape included.
+      if (scene === 'open') return
 
       if (event.key === 'Escape') {
         if (scene === 'universe' && atlas.catalogueOpen) setAtlas((a) => ({ ...a, catalogueOpen: false }))
@@ -594,6 +600,8 @@ export default function App() {
       loadDeepSpaceLayer().catch(() => {})
       loadAtlasLayer().catch(() => {})
       import('./scenes/AtlasExplorer.jsx').catch(() => {})
+      import('./scenes/OpenUniverse.jsx').catch(() => {})
+      loadOpenUniverseHud().catch(() => {})
       loadMissionExplorer().catch(() => {})
     }, 3000)
     return () => window.clearTimeout(id)
@@ -608,6 +616,8 @@ export default function App() {
       ? 'home'
       : scene === 'universe'
         ? 'universe'
+        : scene === 'open'
+        ? 'open'
         : scene === 'black-holes'
         ? 'black-holes'
         : scene === 'phenomena'
@@ -701,6 +711,19 @@ export default function App() {
           onExplore={exploreObject}
           showToast={showToast}
           reducedMotion={reducedMotion}
+        />
+      </Suspense>
+    )
+  } else if (inUniverse && scene === 'open') {
+    hud = (
+      <Suspense key="open" fallback={null}>
+        <OpenUniverseHud
+          onExit={exitToLanding}
+          onExplore={exploreObject}
+          showToast={showToast}
+          reducedMotion={reducedMotion}
+          touch={touch}
+          compact={bottomSheets}
         />
       </Suspense>
     )

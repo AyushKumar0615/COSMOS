@@ -18,6 +18,7 @@ import { getWorldTexture } from '../../lib/planetTextures.js'
 import { bodyVisual } from '../../lib/bodyVisuals.js'
 import { reportEvents } from '../../lib/solarEvents.js'
 import { scaleCount } from '../../lib/quality.js'
+import { sampleBelt } from '../../lib/belts.js'
 
 const DEG = Math.PI / 180
 const AU_KM = 149597870.7
@@ -581,38 +582,16 @@ const beltFragment = /* glsl */ `
   }
 `
 
-/** Resonances with Jupiter clear gaps in the asteroid belt (Kirkwood gaps). */
-function kirkwoodGaps(aJupiter) {
-  return [[3, 1], [5, 2], [7, 3], [2, 1]].map(([p, q]) => aJupiter * Math.pow(q / p, 2 / 3))
-}
-
 function buildBelt(kind, count) {
   const orbitAttr = new Float32Array(count * 4)
   const rateAttr = new Float32Array(count * 2)
   const position = new Float32Array(count * 3)
-  const aJ = ORBIT_DATA.planets.jupiter.a
-  const aN = ORBIT_DATA.planets.neptune.a
-  const gaps = kirkwoodGaps(aJ)
-  let n = 0
-  while (n < count) {
-    let a
-    let incl
-    if (kind === 'asteroid') {
-      a = 2.1 + Math.random() * 1.2
-      // Thin out the resonances: a narrow band around each gap stays nearly empty.
-      if (gaps.some((g) => Math.abs(a - g) < 0.03) && Math.random() < 0.92) continue
-      incl = Math.abs(gaussian()) * 8 * DEG
-    } else {
-      const roll = Math.random()
-      if (roll < 0.2) a = aN * Math.pow(3 / 2, 2 / 3) + gaussian() * 0.3 // plutinos, 3:2 with Neptune
-      else if (roll < 0.75) a = 42 + Math.random() * 5.5 // the classical belt
-      else a = 30 + Math.random() * 25 // scattered and outer
-      incl = Math.abs(gaussian()) * (roll < 0.75 ? 6 : 18) * DEG
-    }
+  const orbits = sampleBelt(kind, count)
+  for (let n = 0; n < count; n += 1) {
+    const a = orbits[n * 4]
     const r = radiusFromAu(a)
-    orbitAttr.set([r, incl, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2], n * 4)
+    orbitAttr.set([r, orbits[n * 4 + 1], orbits[n * 4 + 2], orbits[n * 4 + 3]], n * 4)
     rateAttr.set([(Math.PI * 2) / (365.25 * Math.pow(a, 1.5)), (Math.PI * 2) / educationalPeriod(r)], n * 2)
-    n += 1
   }
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(position, 3))
@@ -620,10 +599,6 @@ function buildBelt(kind, count) {
   g.setAttribute('aRate', new THREE.BufferAttribute(rateAttr, 2))
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 40)
   return g
-}
-
-function gaussian() {
-  return Math.sqrt(-2 * Math.log(Math.random() + 1e-9)) * Math.cos(Math.PI * 2 * Math.random())
 }
 
 /**

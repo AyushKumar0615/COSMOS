@@ -29,7 +29,7 @@ function orbitLine(radius) {
   return new THREE.BufferGeometry().setFromPoints(points)
 }
 
-function Surface({ visual, size, reducedMotion }) {
+export function Surface({ visual, size, reducedMotion }) {
   const gl = useThree((state) => state.gl)
   const texture = useMemo(() => {
     if (visual.solar) return null

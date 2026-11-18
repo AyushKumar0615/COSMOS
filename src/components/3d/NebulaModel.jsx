@@ -11,17 +11,17 @@ import { getCloudTexture } from '../../lib/cloudTexture.js'
  * lit rims sit over the dust: gas (additive), dust (normal), rims
  * (additive), stars, then glows.
  */
-export default function NebulaModel({ nebulaId, opacityRef, reducedMotion }) {
+export default function NebulaModel({ nebulaId, opacityRef, reducedMotion, followScale = false, data: given = null }) {
   const gl = useThree((state) => state.gl)
   const texture = useMemo(() => getCloudTexture(gl), [gl])
-  const data = useMemo(() => generateNebula(nebulaId), [nebulaId])
+  const data = useMemo(() => given ?? generateNebula(nebulaId), [given, nebulaId])
 
   return (
     <group>
-      <CloudSprites sprites={data.clouds} texture={texture} opacityRef={opacityRef} reducedMotion={reducedMotion} renderOrder={1} />
-      <CloudSprites sprites={data.dust} texture={texture} blending="normal" opacityRef={opacityRef} reducedMotion={reducedMotion} renderOrder={2} />
-      <CloudSprites sprites={data.rims} texture={texture} opacityRef={opacityRef} reducedMotion={reducedMotion} renderOrder={3} />
-      <PointCloud {...data.stars} alpha={0.95} scale={1} maxSize={18} opacityRef={opacityRef} renderOrder={4} />
+      <CloudSprites sprites={data.clouds} texture={texture} opacityRef={opacityRef} reducedMotion={reducedMotion} followScale={followScale} renderOrder={1} />
+      <CloudSprites sprites={data.dust} texture={texture} blending="normal" opacityRef={opacityRef} reducedMotion={reducedMotion} followScale={followScale} renderOrder={2} />
+      <CloudSprites sprites={data.rims} texture={texture} opacityRef={opacityRef} reducedMotion={reducedMotion} followScale={followScale} renderOrder={3} />
+      <PointCloud {...data.stars} alpha={0.95} scale={1} maxSize={18} opacityRef={opacityRef} followScale={followScale} renderOrder={4} />
       {data.glows.map((glow, index) => (
         <GlowSprite
           key={index}

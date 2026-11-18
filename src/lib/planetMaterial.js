@@ -64,6 +64,10 @@ export function createPlanetMaterial({
     uOcc: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
     uOccStrength: { value: [0, 0, 0, 0] },
     uOccTint: { value: new THREE.Color(occluderTint) },
+    // Where the Sun is: a point (w = 0, the world origin by default, as in the
+    // solar system) or a fixed direction (w = 1, the open universe, where the
+    // render origin is the camera).
+    uSun: { value: new THREE.Vector4(0, 0, 0, 0) },
   }
   material.userData.uniforms = uniforms
 
@@ -106,18 +110,22 @@ export function createPlanetMaterial({
          uniform vec4 uOcc[4];
          uniform float uOccStrength[4];
          uniform vec3 uOccTint;
+         uniform vec4 uSun;
          varying vec3 vPWorld;
          varying vec3 vPNormal;
          varying vec3 vPCenter;
          varying vec3 vPAxis;
-         varying float vPScale;`,
+         varying float vPScale;
+         vec3 planetSunDir() {
+           return uSun.w > 0.5 ? uSun.xyz : normalize(uSun.xyz - vPWorld);
+         }`,
       )
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
          #ifdef PLANET_NIGHT
            float cityLight = texture2D(uDataMap, vMapUv).b;
-           float sunFacing = dot(normalize(vPNormal), normalize(-vPWorld));
+           float sunFacing = dot(normalize(vPNormal), planetSunDir());
            float darkSide = 1.0 - smoothstep(-0.2, 0.06, sunFacing);
            #ifdef PLANET_CLOUD_SHADOW
              cityLight *= 1.0 - 0.7 * texture2D(uCloudMap, vec2(vMapUv.x - uCloudShift, vMapUv.y)).a;
@@ -134,7 +142,7 @@ export function createPlanetMaterial({
          #endif
          #ifdef PLANET_RING_SHADOW
            {
-             vec3 toSun = normalize(-vPWorld);
+             vec3 toSun = planetSunDir();
              float facing = dot(toSun, vPAxis);
              if (abs(facing) > 1e-4) {
                float t = dot(vPCenter - vPWorld, vPAxis) / facing;
@@ -149,7 +157,7 @@ export function createPlanetMaterial({
          vec3 eclipseTint = vec3(1.0);
          #ifdef PLANET_OCCLUDERS
            {
-             vec3 toSun = normalize(-vPWorld);
+             vec3 toSun = planetSunDir();
              for (int k = 0; k < 4; k++) {
                if (uOccStrength[k] <= 0.0) continue;
                vec3 toBody = uOcc[k].xyz - vPWorld;
@@ -171,7 +179,7 @@ export function createPlanetMaterial({
            {
              vec3 n = normalize(vPNormal);
              vec3 v = normalize(cameraPosition - vPWorld);
-             float sunFacing = dot(n, normalize(-vPWorld));
+             float sunFacing = dot(n, planetSunDir());
              float fresnel = pow(1.0 - max(dot(n, v), 0.0), 2.4);
              float day = smoothstep(-0.12, 0.4, sunFacing);
              float twilight = exp(-pow(sunFacing / 0.09, 2.0));

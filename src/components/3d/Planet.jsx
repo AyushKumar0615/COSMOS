@@ -25,7 +25,7 @@ const TAU = Math.PI * 2
  * bump units; haze is the day-side tint and terminator glow added on the
  * surface itself (the shell in PlanetAtmosphere draws the limb).
  */
-const LOOK = {
+export const PLANET_LOOK = {
   mercury: { bumpScale: 3.2 },
   venus: { roughness: 1, haze: { color: '#ffcf7a', twilight: '#ff9a4a', strength: 0.22 } },
   earth: {
@@ -88,7 +88,7 @@ export default function Planet({
   const cloudMap = planet.id === 'earth' ? textures.clouds : planet.id === 'neptune' ? textures.neptuneClouds : null
 
   const material = useMemo(() => {
-    const look = LOOK[planet.id] ?? {}
+    const look = PLANET_LOOK[planet.id] ?? {}
     return createPlanetMaterial({
       map: textures.surfaces[planet.id],
       data: textures.data[planet.id] ?? null,

@@ -158,3 +158,38 @@ true-scale mode, Cassini's archived trajectory, measuring tool.
 "Continue the COSMOS overnight mission from COSMOS_OVERNIGHT_PROGRESS.md: do the
 next unfinished task, run `npm test` and `npm run test:browser`, update this file.
 Do not commit, push or deploy."
+
+---
+
+# Mission 2 — open-world universe (2026-11-19)
+
+Detailed notes: `COSMOS_OPEN_WORLD_PROGRESS.md`. Prioritised list: `COSMOS_OVERNIGHT_TODO.md`.
+Branch `main`; local commits allowed, nothing pushed or deployed.
+
+## Cycle A–D — open universe core (verified)
+
+- New scene `open` ("Open Universe" in the nav): continuous galactic-coordinate
+  world in float64 km with a floating origin and compressed depth (true
+  directions and angular sizes); 198 catalogued objects from JPL, SIMBAD and
+  the Exoplanet Archive; level of detail from points to meshes and models;
+  procedural field stars per hashed cell; Milky Way band inside, model outside.
+- Astronaut (EVA suit, visor, backpack, joints, gloves), third/first person.
+- Flight: WASD, Space/Ctrl/C, Shift ×10, Q/E roll, drag or pointer-lock look,
+  nine speed presets 1 km/s–10²¹ km/s, response and dampers, touch joystick.
+- Discovery HUD: ahead list, nearby, markers hidden behind planets, compass,
+  radar, position, target bar, autopilot, map, search, bookmarks, saved
+  places, discovery notices, optional generated sound.
+- Tests: unit 34/34; open-universe browser tests 5/5 (six axes in the ship
+  frame, speeds, camera modes, astronaut orientation, discovery, distances vs
+  true geometry, autopilot arrival/cancel, map, bookmarks, touch, phone,
+  landscape, reduced motion); performance 60 fps idle and in fast travel,
+  heap flat (13.9 → 13.9 MB).
+
+## Resume
+
+``` bash
+cd ~/Documents/projects/COSMOS
+git status && git log --oneline -3
+npm test && npm run test:browser
+```
+Then take the first open item in COSMOS_OVERNIGHT_TODO.md.

@@ -11,7 +11,7 @@ const stroke = {
   fill: 'none',
 }
 
-function Key({ children }) {
+export function Key({ children }) {
   return (
     <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-white/15 bg-white/[0.04] px-1.5 font-mono text-[0.625rem] text-ink-dim">
       {children}
@@ -20,7 +20,7 @@ function Key({ children }) {
 }
 
 /** Press-and-hold button that writes -1/0/1 into input.vertical. */
-function HoldButton({ input, direction, label, children }) {
+export function HoldButton({ input, direction, label, children }) {
   const set = (value) => {
     input.current.vertical = value
   }

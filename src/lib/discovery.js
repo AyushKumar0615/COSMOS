@@ -92,6 +92,8 @@ const subscribe = (listener) => {
   return () => listeners.delete(listener)
 }
 
+export const getDiscovery = () => state
+
 export function useDiscovery() {
   return useSyncExternalStore(subscribe, () => state, () => EMPTY)
 }

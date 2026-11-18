@@ -137,7 +137,7 @@ async function snap(page, name, state) {
 
 // First, on purpose: on a laptop, a long run warms the machine and lowers frame
 // rates in every scene, which would be measuring the test run itself.
-test('performance: load weight, frame rates and memory', { timeout: 90000 }, async () => {
+test('performance: load weight, frame rates and memory', { timeout: 150000 }, async () => {
   const page = await open(VIEWPORTS.desktop)
   await page.waitFor(textIncludes('enter universe'), 'landing')
   const paint = await page.evaluate(`performance.getEntriesByName('first-contentful-paint')[0]?.startTime`)
@@ -176,10 +176,18 @@ test('performance: load weight, frame rates and memory', { timeout: 90000 }, asy
   await openObject(page, 'jupiter')
   await sleep(3600)
   rates.system = await page.evaluate(fps)
+  await page.click('Open Universe', { within: 'header' })
+  await page.waitFor(`window.__cosmosOpen && document.querySelector('[aria-label="Velocity"]')`, 'open universe')
+  await sleep(3000)
+  rates.openUniverse = await page.evaluate(fps)
+  // Flying fast through the procedural star cells, where they rebuild every frame.
+  await page.evaluate(`__cosmosOpen.set({ targetId: 'andromeda', autopilot: true })`)
+  await sleep(1500)
+  rates.openUniverseTravel = await page.evaluate(fps)
 
   const heapBefore = await page.liveHeap()
   for (let i = 0; i < 3; i += 1) {
-    for (const scene of ['Universe', 'Galaxies', 'Black Holes', 'Nebulae']) {
+    for (const scene of ['Universe', 'Galaxies', 'Black Holes', 'Open Universe', 'Nebulae']) {
       await page.click(scene, { within: 'header' })
       await sleep(2200)
     }
@@ -1037,6 +1045,210 @@ test('on a slow connection the landing page does not wait for Three.js', { timeo
   await page.waitFor(textIncludes('enter universe'), 'landing', 30000)
   assert.equal(await page.evaluate(`!!window.__cosmos`), false, 'landing should be up before the 3D engine')
   await page.waitFor(`window.__cosmos`, 'the 3D engine to arrive afterwards', 30000)
+  assert.deepEqual(page.problems, [])
+  await page.close()
+})
+
+// --- Open universe -------------------------------------------------------------------------
+
+const ship = (page) => page.evaluate(`JSON.stringify({ pos: __cosmosOpen.ship.pos, quat: __cosmosOpen.ship.quat, speed: __cosmosOpen.ship.speed })`).then(JSON.parse)
+const openSettings = (page) => page.evaluate(`JSON.stringify(__cosmosOpen.settings())`).then(JSON.parse)
+// A world-space displacement in the ship's own frame: [right, up, back].
+function toLocal([x, y, z], [qx, qy, qz, qw]) {
+  // Rotate by the inverse quaternion.
+  const ix = -qx, iy = -qy, iz = -qz
+  const tx = 2 * (iy * z - iz * y)
+  const ty = 2 * (iz * x - ix * z)
+  const tz = 2 * (ix * y - iy * x)
+  return [x + qw * tx + (iy * tz - iz * ty), y + qw * ty + (iz * tx - ix * tz), z + qw * tz + (ix * ty - iy * tx)]
+}
+
+async function enterOpen(page, viewport = VIEWPORTS.desktop) {
+  await page.waitFor(textIncludes('enter universe'), 'landing')
+  await sleep(1200)
+  if (viewport.width < 1280) {
+    await page.click('Open menu')
+    await sleep(500)
+  }
+  await page.click('Open Universe')
+  await page.waitFor(`window.__cosmosOpen && document.querySelector('[aria-label="Velocity"]')`, 'open universe')
+  await sleep(2500)
+}
+
+test('open universe: six directions, speed, camera modes and the astronaut', { timeout: 120000 }, async () => {
+  const page = await open(VIEWPORTS.desktop)
+  await enterOpen(page)
+  fs.mkdirSync(path.join(output, 'open'), { recursive: true })
+  await page.screenshot(path.join(output, 'open', 'start.png'))
+  assert.match(await page.evaluate(bodyText), /earth/i, 'starts beside Earth')
+  await page.evaluate(`__cosmosOpen.set({ speedLog: 2, response: 0.3 })`)
+
+  // Each key moves the ship along its own axis, in the ship's frame.
+  const moves = { w: [2, -1], s: [2, 1], d: [0, 1], a: [0, -1], Space: [1, 1], c: [1, -1] }
+  for (const [key, [axis, sign]] of Object.entries(moves)) {
+    const before = await ship(page)
+    await page.key(key, { hold: 700 })
+    await sleep(900)
+    const after = await ship(page)
+    const local = toLocal(after.pos.map((v, i) => v - before.pos[i]), after.quat)
+    const main = Math.abs(local[axis])
+    assert.ok(Math.sign(local[axis]) === sign && main > 30, `${key}: ${local.map((v) => v.toFixed(1))}`)
+    assert.ok(local.every((v, i) => i === axis || Math.abs(v) < main * 0.1), `${key} stays on its axis: ${local}`)
+  }
+
+  // Speed: presets, the readout, and light-speed multiples.
+  await page.key('4')
+  assert.ok(Math.abs((await openSettings(page)).speedLog - Math.log10(299792.458)) < 1e-9)
+  assert.match(await page.evaluate(`document.querySelector('[data-testid=open-cruise]').innerText`), /299,792 km\/s/)
+  await page.key('w', { hold: 1200 })
+  const flying = await page.evaluate(`document.querySelector('[aria-label="Velocity"]').innerText`)
+  assert.match(flying, /\d c/i, 'shows multiples of c while moving')
+  await sleep(1500)
+  await page.key('2')
+
+  // Turning by drag; the astronaut keeps facing where the ship faces.
+  const before = await ship(page)
+  await page.drag([700, 450], [900, 380])
+  await sleep(800)
+  const turned = await ship(page)
+  const dot = before.quat.reduce((sum, v, i) => sum + v * turned.quat[i], 0)
+  assert.ok(Math.abs(dot) < 0.999, 'dragging turns the view')
+  const astronaut = await page.evaluate(`(() => { const a = __cosmosAstronaut; const q = __cosmosOpen.ship.quat; const d = a.quaternion.x*q[0]+a.quaternion.y*q[1]+a.quaternion.z*q[2]+a.quaternion.w*q[3]; return { visible: a.visible, alignment: Math.abs(d), ahead: a.position.clone().applyQuaternion(a.quaternion.clone().invert()).z } })()`)
+  assert.ok(astronaut.visible && astronaut.alignment > 0.999 && astronaut.ahead < -1, JSON.stringify(astronaut))
+  await page.key('v')
+  await sleep(1500)
+  assert.equal((await openSettings(page)).camera, 'first')
+  assert.equal(await page.evaluate(`__cosmosAstronaut.visible`), false, 'first person hides the astronaut')
+  await page.screenshot(path.join(output, 'open', 'first-person.png'))
+  await page.key('v')
+  await sleep(1500)
+  assert.equal(await page.evaluate(`__cosmosAstronaut.visible`), true)
+
+  // Pause holds position; reset returns to Earth.
+  await page.key('p')
+  const paused = await ship(page)
+  await page.key('w', { hold: 600 })
+  assert.ok(moved(paused.pos, (await ship(page)).pos) < 1e-6, 'paused ships do not move')
+  await page.key('p')
+  await page.key('r')
+  await sleep(600)
+  const home = await page.evaluate(`(() => { const e = __cosmosOpen.world.byId.earth; const p = __cosmosOpen.ship.pos; return Math.hypot(p[0]-e.pos[0], p[1]-e.pos[1], p[2]-e.pos[2]) / e.radiusKm })()`)
+  assert.ok(Math.abs(home - 4.6) < 0.1, `reset to Earth: ${home}`)
+  assert.deepEqual(page.problems, [])
+  await page.close()
+})
+
+test('open universe: discovery ahead, distances, autopilot, map and bookmarks', { timeout: 150000 }, async () => {
+  const page = await open(VIEWPORTS.desktop)
+  await enterOpen(page)
+
+  // Face the Sun: it heads the "ahead" list, with a distance in km or AU.
+  await page.evaluate(`__cosmosOpen.commands.face = { id: 'sun', at: 1 }`)
+  await sleep(2500)
+  const ahead = await page.evaluate(`document.querySelector('[aria-label="Objects ahead"]').innerText`)
+  assert.match(ahead, /^Sun/m, ahead)
+  assert.match(ahead, /AU|million km/)
+  // Turn to Andromeda: listed in megaparsecs (its marker may be hidden
+  // behind Earth on some dates, which the list then says).
+  await page.evaluate(`__cosmosOpen.commands.face = { id: 'andromeda', at: 2 }`)
+  await sleep(3000)
+  assert.match(await page.evaluate(`document.querySelector('[aria-label="Objects ahead"]').innerText`), /Andromeda[\s\S]*Mpc/)
+
+  // The distance shown matches the true distance.
+  await page.click('Find')
+  await page.click('Search the universe')
+  await page.type('Mars')
+  await sleep(300)
+  await page.evaluate(`document.querySelector('[aria-label="Search results"] button').click()`)
+  await page.waitFor(`document.querySelector('[aria-label="Mars profile"]')`, 'Mars profile')
+  await sleep(400)
+  const shown = await page.evaluate(`document.querySelector('[aria-label^="Target: Mars"]').innerText`)
+  const trueAu = await page.evaluate(`(() => { const m = __cosmosOpen.world.byId.mars; const p = __cosmosOpen.ship.pos; return Math.hypot(p[0]-m.pos[0], p[1]-m.pos[1], p[2]-m.pos[2]) / 149597870.7 })()`)
+  const shownAu = Number(shown.match(/([\d.]+) AU/)[1])
+  assert.ok(Math.abs(shownAu - trueAu) / trueAu < 0.01, `${shownAu} vs ${trueAu}`)
+
+  // Bookmark from the profile, then autopilot there.
+  await page.click('Bookmark Mars')
+  assert.ok(await page.evaluate(`localStorage.getItem('cosmos.discovery.v1').includes('"mars"')`))
+  await page.click('Autopilot here')
+  await page.waitFor(`!__cosmosOpen.settings().autopilot`, 'arrival at Mars', 40000)
+  await sleep(1200)
+  const arrived = await page.evaluate(`(() => { const m = __cosmosOpen.world.byId.mars; const p = __cosmosOpen.ship.pos; return Math.hypot(p[0]-m.pos[0], p[1]-m.pos[1], p[2]-m.pos[2]) / m.stopKm })()`)
+  assert.ok(Math.abs(arrived - 1) < 0.05, `stopped at ${arrived} × the stop distance`)
+  assert.match(await page.evaluate(bodyText), /Mars/)
+  await page.screenshot(path.join(output, 'open', 'mars.png'))
+
+  // Cancel mid-flight by thrusting.
+  await page.evaluate(`__cosmosOpen.set({ targetId: 'saturn', autopilot: true })`)
+  await sleep(1200)
+  await page.key('w', { hold: 300 })
+  await sleep(200)
+  assert.equal((await openSettings(page)).autopilot, false, 'thrust cancels autopilot')
+
+  // The map: pick a destination far away.
+  await page.key('m')
+  await page.waitFor(`document.querySelector('[role=dialog][aria-label="Universe map"]')`, 'map')
+  await page.screenshot(path.join(output, 'open', 'map.png'))
+  await page.click('Zoom map out')
+  await page.evaluate(`[...document.querySelectorAll('[aria-label="Objects on the map"] button')].find((b) => b.innerText.includes('Sirius'))?.click() ?? document.querySelector('[aria-label="Objects on the map"] button').click()`)
+  await sleep(500)
+  assert.ok(!(await page.evaluate(`!!document.querySelector('[aria-label="Universe map"]')`)), 'picking closes the map')
+  assert.ok((await openSettings(page)).targetId)
+  // Off to the stars, then a galaxy: a discovery notice on arrival.
+  await page.evaluate(`__cosmosOpen.set({ targetId: 'pleiades', autopilot: true })`)
+  await page.waitFor(`!__cosmosOpen.settings().autopilot`, 'arrival at the Pleiades', 40000)
+  await page.waitFor(textIncludes('pleiades'), 'Pleiades region')
+  await page.screenshot(path.join(output, 'open', 'pleiades.png'))
+  // In open space, a marker sits on whatever lies ahead.
+  await page.evaluate(`__cosmosOpen.commands.face = { id: 'andromeda', at: 3 }`)
+  await sleep(3000)
+  const marker = await page.evaluate(`[...document.querySelectorAll('[aria-label="Objects in view"] button')].some((b) => b.dataset.id === 'andromeda' && b.style.opacity === '1')`)
+  assert.ok(marker, 'a marker sits on Andromeda')
+  await page.evaluate(`__cosmosOpen.set({ targetId: 'andromeda', autopilot: true })`)
+  await page.waitFor(`!__cosmosOpen.settings().autopilot`, 'arrival at Andromeda', 40000)
+  await sleep(1500)
+  assert.match(await page.evaluate(`document.querySelector('[aria-live=polite]').innerText`), /andromeda/i, 'arriving puts you in its region')
+  await page.screenshot(path.join(output, 'open', 'andromeda.png'))
+  assert.ok(await page.evaluate(`JSON.parse(localStorage.getItem('cosmos.discovery.v1')).visited.andromeda`), 'counts as a discovery')
+  assert.deepEqual(page.problems, [])
+  await page.close()
+})
+
+test('open universe: touch, phone and landscape layouts', { timeout: 120000 }, async () => {
+  for (const name of ['phone', 'landscape', 'tablet']) {
+    const viewport = VIEWPORTS[name]
+    const page = await open(viewport)
+    await enterOpen(page, viewport)
+    await snap(page, 'open', `${name}-start`)
+    // The joystick flies forward, in the ship's own frame.
+    const pad = await page.evaluate(`(() => { const r = document.querySelector('[aria-label*="oystick" i], [role=application], [data-joystick]').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2] })()`)
+    const before = await ship(page)
+    const hold = await page.drag(pad, [pad[0], pad[1] - 45], { touch: true, steps: 4 })
+    await sleep(900)
+    await hold.release()
+    await sleep(300)
+    const after = await ship(page)
+    const local = toLocal(after.pos.map((v, i) => v - before.pos[i]), after.quat)
+    assert.ok(local[2] < -100 && Math.abs(local[0]) < -local[2] * 0.2, `joystick forward: ${local.map((v) => v.toFixed(0))}`)
+    await page.evaluate(`__cosmosOpen.set({ targetId: 'moon', autopilot: true })`)
+    await page.waitFor(`!__cosmosOpen.settings().autopilot`, 'arrival at the Moon', 40000)
+    await sleep(1000)
+    await snap(page, 'open', `${name}-moon`)
+    await page.click('Discover')
+    await sleep(500)
+    await snap(page, 'open', `${name}-discover`)
+    assert.deepEqual(page.problems, [])
+    await page.close()
+  }
+})
+
+test('open universe: reduced motion arrives without the long glide', { timeout: 60000 }, async () => {
+  const page = await open({ ...VIEWPORTS.desktop, reducedMotion: true })
+  await enterOpen(page)
+  await page.evaluate(`__cosmosOpen.set({ targetId: 'jupiter', autopilot: true })`)
+  await sleep(1000)
+  assert.equal((await openSettings(page)).autopilot, false, 'arrived within a second')
+  assert.match(await page.evaluate(`document.querySelector('[aria-live=polite]').innerText`), /jupiter/i)
   assert.deepEqual(page.problems, [])
   await page.close()
 })

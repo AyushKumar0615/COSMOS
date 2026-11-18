@@ -12,10 +12,11 @@ const BUILT = [
   `${GALAXY_IDS.length} galaxies and ${NEBULA_IDS.length} nebulae to explore`,
   'Phenomena: supernova, pulsar, wormhole, spacetime, scale, stellar life cycle and exoplanets',
   'Universe atlas: a searchable catalogue of stars, systems and deep-sky objects',
+  'Open universe: one continuous space from Earth orbit to distant galaxies, flown as an astronaut, with live discovery and autopilot',
   'Mission archive: fourteen missions from NASA, ISRO, ESA and JAXA',
 ]
 
-const NEXT = ['Constellation overlays and on-screen labels', 'A true-scale mode for distances and sizes']
+const NEXT = ['Constellation overlays', 'A true-scale mode for distances and sizes']
 
 export default function AboutPanel({ onClose, reducedMotion }) {
   const panelRef = useRef(null)

@@ -305,12 +305,8 @@ export function generateGalaxy(fullModel) {
   }
 
   // Approximate position of the Sun, for the Milky Way's "you are here".
-  let marker = null
-  if (model.sunMarker) {
-    const { radius, armIndex, offset } = model.sunMarker
-    const theta = armAngle(model.arms[armIndex], radius, model) + offset
-    marker = [radius * Math.cos(theta), 0, radius * Math.sin(theta)]
-  }
+  const theta = sunMarkerAngle(model)
+  const marker = theta == null ? null : [model.sunMarker.radius * Math.cos(theta), 0, model.sunMarker.radius * Math.sin(theta)]
 
   return {
     stars: stars.build(),
@@ -320,4 +316,11 @@ export function generateGalaxy(fullModel) {
     marker,
     pointCount: stars.count + dust.count + knots.count,
   }
+}
+
+/** Angle of the Sun marker in a model's disc, or null if it has none. */
+export function sunMarkerAngle(model) {
+  if (!model.sunMarker) return null
+  const { radius, armIndex, offset } = model.sunMarker
+  return armAngle(model.arms[armIndex], radius, model) + offset
 }
