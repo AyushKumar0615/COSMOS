@@ -3,9 +3,10 @@ import { prng } from './openWorld.js'
 
 /**
  * Textures for the open-universe astronaut, drawn on canvases at runtime (no
- * downloads): the suit's ripstop "ortho-fabric" as normal and roughness maps,
- * a dark space environment for reflections, and the flag, mission patch and
- * name tag. Everything is created per mount and disposed by the caller.
+ * downloads): the suit's ripstop outer fabric (normal, roughness and albedo
+ * variation), seam stitching, and the flag, mission patch and name tag.
+ * Reflections come from the live scene, not from a texture here. Everything
+ * is created per mount and disposed by the caller.
  */
 
 const canvas = (w, h) => {
@@ -16,95 +17,133 @@ const canvas = (w, h) => {
 }
 
 /**
- * Woven technical fabric: a fine plain weave, a raised ripstop grid every few
- * millimetres, and faint irregularity. Returns tiling normal and roughness maps.
+ * Woven technical fabric, the outer layer of a multilayer suit: a fine
+ * plain weave with uneven threads, a raised ripstop grid, slubs (thicker
+ * runs of yarn) and soft puckering from the layers beneath. Returns tiling
+ * normal, roughness and albedo-variation maps; the albedo carries faint,
+ * even wear so the white is not a flat paint.
  */
-export function fabricMaps(size = 256) {
+export function fabricMaps(size = 512) {
   const random = prng(7)
   const height = new Float32Array(size * size)
-  const cell = size / 8 // ripstop grid: 8 squares per tile
+  const shade = new Float32Array(size * size)
+  const cell = size / 10 // ripstop grid: 10 squares per tile
+  // Per-thread thickness, so the weave is not machine-perfect.
+  const warpT = Float32Array.from({ length: size }, () => 0.8 + random() * 0.4)
+  const weftT = Float32Array.from({ length: size }, () => 0.8 + random() * 0.4)
+  // Slubs: short thicker runs along random threads.
+  const slubs = Array.from({ length: 40 }, () => ({ x: (random() * size) | 0, y: (random() * size) | 0, len: 10 + random() * 30, h: random() < 0.5 }))
+  // Low-frequency puckering from the insulation layers underneath.
+  const pucker = (x, y) => {
+    const u = (x / size) * Math.PI * 2
+    const v = (y / size) * Math.PI * 2
+    return Math.sin(u * 3 + Math.sin(v * 2) * 1.3) * Math.cos(v * 4 + Math.sin(u * 3) * 0.8) * 0.5 + Math.sin(u * 7 + v * 5) * 0.2
+  }
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      // Plain weave: alternating warp and weft bumps.
-      const warp = Math.sin((x / size) * Math.PI * 2 * 64) * (((y >> 1) & 1) ? 1 : -1)
-      const weft = Math.sin((y / size) * Math.PI * 2 * 64) * (((x >> 1) & 1) ? 1 : -1)
-      let h = 0.18 * (warp + weft)
-      // Ripstop: thicker threads along the grid.
-      const gx = Math.abs(((x % cell) + cell) % cell - cell / 2) / (cell / 2)
-      const gy = Math.abs(((y % cell) + cell) % cell - cell / 2) / (cell / 2)
-      h += 0.9 * Math.max(Math.max(0, gx - 0.9) * 10, Math.max(0, gy - 0.9) * 10)
-      height[y * size + x] = h + (random() - 0.5) * 0.12
+      const warp = Math.sin((x / size) * Math.PI * 2 * 96) * ((y >> 1) & 1 ? 1 : -1) * warpT[x]
+      const weft = Math.sin((y / size) * Math.PI * 2 * 96) * ((x >> 1) & 1 ? 1 : -1) * weftT[y]
+      let h = 0.16 * (warp + weft)
+      const gx = Math.abs((x % cell) - cell / 2) / (cell / 2)
+      const gy = Math.abs((y % cell) - cell / 2) / (cell / 2)
+      h += 0.8 * Math.max(Math.max(0, gx - 0.92) * 12, Math.max(0, gy - 0.92) * 12)
+      h += pucker(x, y) * 0.9
+      height[y * size + x] = h + (random() - 0.5) * 0.1
+      shade[y * size + x] = 0
+    }
+  }
+  for (const s of slubs) {
+    for (let k = 0; k < s.len; k += 1) {
+      const x = (s.h ? s.x + k : s.x) % size
+      const y = (s.h ? s.y : s.y + k) % size
+      height[y * size + x] += 0.35 * Math.sin((k / s.len) * Math.PI)
+    }
+  }
+  // Wear: a few large, very faint smudges and a fine mottling.
+  const smudges = Array.from({ length: 7 }, () => ({ x: random() * size, y: random() * size, r: 20 + random() * 60, a: 0.02 + random() * 0.03 }))
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      let d = (random() - 0.5) * 0.025
+      for (const m of smudges) {
+        const dx = Math.min(Math.abs(x - m.x), size - Math.abs(x - m.x))
+        const dy = Math.min(Math.abs(y - m.y), size - Math.abs(y - m.y))
+        d -= m.a * Math.exp(-(dx * dx + dy * dy) / (m.r * m.r))
+      }
+      shade[y * size + x] = d
     }
   }
   const normal = canvas(size, size)
   const rough = canvas(size, size)
+  const albedo = canvas(size, size)
   const n = normal.getContext('2d').createImageData(size, size)
   const r = rough.getContext('2d').createImageData(size, size)
+  const a = albedo.getContext('2d').createImageData(size, size)
   const at = (x, y) => height[((y + size) % size) * size + ((x + size) % size)]
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      const dx = at(x + 1, y) - at(x - 1, y)
-      const dy = at(x, y + 1) - at(x, y - 1)
+      const dx = (at(x + 1, y) - at(x - 1, y)) * 1.4
+      const dy = (at(x, y + 1) - at(x, y - 1)) * 1.4
       const len = Math.hypot(dx, dy, 1)
       const i = (y * size + x) * 4
       n.data[i] = ((-dx / len) * 0.5 + 0.5) * 255
       n.data[i + 1] = ((dy / len) * 0.5 + 0.5) * 255
       n.data[i + 2] = (1 / len) * 255
       n.data[i + 3] = 255
-      // Raised threads catch a little more light than the hollows.
-      const v = 200 + Math.max(-40, Math.min(40, -at(x, y) * 30))
+      // Raised threads are a touch glossier than the hollows between them.
+      const v = 205 + Math.max(-45, Math.min(35, -at(x, y) * 28))
       r.data[i] = r.data[i + 1] = r.data[i + 2] = v
       r.data[i + 3] = 255
+      // Albedo near white, a warm cast in the hollows, faint wear.
+      const base = 1 + shade[y * size + x] + Math.min(0, at(x, y)) * 0.02
+      a.data[i] = Math.min(255, 255 * base)
+      a.data[i + 1] = Math.min(255, 252 * base)
+      a.data[i + 2] = Math.min(255, 246 * base)
+      a.data[i + 3] = 255
     }
   }
   normal.getContext('2d').putImageData(n, 0, 0)
   rough.getContext('2d').putImageData(r, 0, 0)
+  albedo.getContext('2d').putImageData(a, 0, 0)
   const wrap = (c, srgb) => {
     const t = new THREE.CanvasTexture(c)
     t.wrapS = t.wrapT = THREE.RepeatWrapping
-    t.anisotropy = 4
+    t.anisotropy = 8
     if (srgb) t.colorSpace = THREE.SRGBColorSpace
     return t
   }
-  return { normal: wrap(normal, false), roughness: wrap(rough, false) }
+  return { normal: wrap(normal, false), roughness: wrap(rough, false), albedo: wrap(albedo, true) }
 }
 
-/** A dark sky with a Milky Way band and one bright source, for visor and metal reflections. */
-export function spaceEnvironment(gl) {
-  const w = 512
-  const h = 256
+/**
+ * Seam piping with two rows of lock stitches, for a band whose u runs round
+ * the limb: thread-coloured dashes on fabric, with the needle holes darker.
+ */
+export function stitchTexture() {
+  const w = 64
+  const h = 32
   const c = canvas(w, h)
   const g = c.getContext('2d')
-  g.fillStyle = '#030408'
+  const fabric = g.createLinearGradient(0, 0, 0, h)
+  fabric.addColorStop(0, '#d9d7cf')
+  fabric.addColorStop(0.5, '#ecebe5')
+  fabric.addColorStop(1, '#d9d7cf')
+  g.fillStyle = fabric
   g.fillRect(0, 0, w, h)
-  // A soft, wide band of light (the galaxy) across the equator.
-  const band = g.createLinearGradient(0, h * 0.3, 0, h * 0.7)
-  band.addColorStop(0, 'rgba(120,130,160,0)')
-  band.addColorStop(0.5, 'rgba(150,155,175,0.35)')
-  band.addColorStop(1, 'rgba(120,130,160,0)')
-  g.fillStyle = band
-  g.fillRect(0, h * 0.3, w, h * 0.4)
-  const random = prng(19)
-  for (let i = 0; i < 900; i += 1) {
-    const a = 0.3 + random() * 0.7
-    g.fillStyle = `rgba(255,255,255,${a})`
-    g.fillRect(random() * w, random() * h, random() < 0.1 ? 2 : 1, 1)
+  for (const y of [7, 25]) {
+    for (let x = 0; x < w; x += 16) {
+      g.fillStyle = '#b9b6ac'
+      g.fillRect(x + 1, y - 1, 2, 2)
+      g.fillStyle = '#f7f6f1'
+      g.fillRect(x + 3, y - 1, 10, 2)
+      g.fillStyle = 'rgba(80,78,70,0.35)'
+      g.fillRect(x + 3, y + 1, 10, 1)
+    }
   }
-  // A bright source high on one side, giving the visor its highlight.
-  const sun = g.createRadialGradient(w * 0.2, h * 0.28, 0, w * 0.2, h * 0.28, h * 0.32)
-  sun.addColorStop(0, 'rgba(255,250,235,1)')
-  sun.addColorStop(0.08, 'rgba(255,240,210,0.9)')
-  sun.addColorStop(1, 'rgba(255,240,210,0)')
-  g.fillStyle = sun
-  g.fillRect(0, 0, w, h)
-  const texture = new THREE.CanvasTexture(c)
-  texture.mapping = THREE.EquirectangularReflectionMapping
-  texture.colorSpace = THREE.SRGBColorSpace
-  const pmrem = new THREE.PMREMGenerator(gl)
-  const target = pmrem.fromEquirectangular(texture)
-  texture.dispose()
-  pmrem.dispose()
-  return target
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = THREE.RepeatWrapping
+  t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = 8
+  return t
 }
 
 const textureFrom = (c) => {
