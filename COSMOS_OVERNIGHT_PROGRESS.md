@@ -210,7 +210,8 @@ Branch `main`; local commits allowed, nothing pushed or deployed.
 - Stars without a measured radius: inferred from magnitude, distance and
   temperature (`radiusFromMagnitude` in `lib/openWorld.js`), labelled Inferred.
   Supergiants were drawn at 3.4 solar radii before.
-- Commits on `open-universe`: `0546ea0`, `dc69234`, `130c2a2`. Unit 36/36.
+- Markers no longer show through the translucent HUD panels.
+- Commits on `open-universe`: `0546ea0`, `dc69234`, `130c2a2`, `3efb9c5`. Unit 36/36; full browser suite 38/38 on the final build.
 
 Next task: the first open item in `COSMOS_OVERNIGHT_TODO.md`.
 

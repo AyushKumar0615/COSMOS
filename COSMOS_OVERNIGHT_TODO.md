@@ -15,6 +15,6 @@ Done items move to COSMOS_OVERNIGHT_PROGRESS.md. Highest priority first.
 11. [ ] Fix the atlas's mirrored galactic axis (needs approval: changes an existing view).
 12. [ ] Safari and real-device testing (needs the user).
 13. [x] Stars with no measured radius: radius inferred from measured magnitude, distance and temperature (labelled Inferred).
-14. [~] Markers hidden beneath HUD panels (`writeMarkers`, `.glass` rects): committed, NOT yet built or browser-tested. Next session: `npm run build && npm run test:browser`, check screenshots.
+14. [x] Markers hidden beneath HUD panels (`writeMarkers`, `.glass` rects); browser suite 38/38, checked at Saturn.
 15. [ ] Constellation lines (needs Hipparcos positions for the figure stars via `npm run catalogue`; not in the data).
 16. [ ] Comet coma glow in the open universe (tails only today; the beacon marks the head).
