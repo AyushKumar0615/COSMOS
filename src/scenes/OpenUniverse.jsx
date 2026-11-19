@@ -162,6 +162,8 @@ export default function OpenUniverse({ reducedMotion }) {
     cells: TIERS.map(() => ''),
     stars: TIERS.map(() => []),
     warnedLight: false,
+    panels: [],
+    panelsAt: 0,
   })
 
   const colors = useMemo(() => world.objects.map((obj) => beaconColor(obj, TYPE_LOOK[obj.type]?.color ?? '#ffffff')), [world])
@@ -765,6 +767,17 @@ function writeMarkers(L, world, view, camera, size) {
   let used = 0
   let targetOff = null
   placed.length = 0
+  // HUD panels are translucent: a marker beneath one would show through.
+  // Their rectangles are read twice a second, not every frame.
+  const now = performance.now()
+  if (now - L.panelsAt > 500) {
+    L.panelsAt = now
+    const origin = root.getBoundingClientRect()
+    L.panels = [...document.querySelectorAll('.glass')].map((el) => {
+      const r = el.getBoundingClientRect()
+      return [r.left - origin.left, r.top - origin.top, r.right - origin.left, r.bottom - origin.top]
+    })
+  }
   for (const id of L.markerIds) {
     if (used >= pool.length) break
     const obj = world.byId[id]
@@ -779,6 +792,7 @@ function writeMarkers(L, world, view, camera, size) {
     }
     const x = ((projected.x + 1) / 2) * size.width
     const y = ((1 - projected.y) / 2) * size.height
+    if (L.panels.some((r) => x > r[0] && x < r[2] && y > r[1] && y < r[3])) continue
     // Labels do not stack: the target first, then the rest in priority order.
     if (id !== L.markerTarget && placed.some((p) => Math.abs(p[0] - x) < 110 && Math.abs(p[1] - y) < 30)) continue
     placed.push([x, y])

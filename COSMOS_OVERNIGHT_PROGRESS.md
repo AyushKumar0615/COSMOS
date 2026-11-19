@@ -199,8 +199,20 @@ Branch `main`; local commits allowed, nothing pushed or deployed.
   heap 14.0 → 13.9 MB; first contentful paint 176 ms.
 - Final report: `COSMOS_OVERNIGHT_FINAL_REPORT.md`.
 
-Next task: the first open item in `COSMOS_OVERNIGHT_TODO.md` (comet tails in
-the open universe), after the user reviews the branch.
+## Cycle K — comet tails, lensing, star sizes (2026-11-19, continued)
+
+- Comet tails in the open universe (`components/3d/open/CometTails.jsx`):
+  ion and dust tails drawn through the compressed space from JPL positions;
+  shader shared with the solar scene (`lib/cometTail.js`). Fixed the tail
+  ribbon being back-face culled from one side (also in the solar scene).
+- Weak-field lensing of the sky around the strongest black hole (`open/Sky.jsx`,
+  deflection 2Rs/b, shadow at 2.6 Rs); verified at Sgr A* and Cygnus X-1.
+- Stars without a measured radius: inferred from magnitude, distance and
+  temperature (`radiusFromMagnitude` in `lib/openWorld.js`), labelled Inferred.
+  Supergiants were drawn at 3.4 solar radii before.
+- Commits on `open-universe`: `0546ea0`, `dc69234`, `130c2a2`. Unit 36/36.
+
+Next task: the first open item in `COSMOS_OVERNIGHT_TODO.md`.
 
 ## Resume
 
