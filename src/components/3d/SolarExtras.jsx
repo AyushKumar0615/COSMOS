@@ -19,6 +19,7 @@ import { bodyVisual } from '../../lib/bodyVisuals.js'
 import { reportEvents } from '../../lib/solarEvents.js'
 import { scaleCount } from '../../lib/quality.js'
 import { sampleBelt } from '../../lib/belts.js'
+import { TAIL_GEOMETRY, cometActivity, tailMaterial } from '../../lib/cometTail.js'
 
 const DEG = Math.PI / 180
 const AU_KM = 149597870.7
@@ -357,38 +358,6 @@ const ROCK = (() => {
 const ROCK_MATERIAL = new THREE.MeshStandardMaterial({ color: '#8a8178', roughness: 0.95, metalness: 0 })
 const NUCLEUS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#3a3532', roughness: 1, metalness: 0 })
 
-const tailVertex = /* glsl */ `
-  uniform vec3 uHead;
-  uniform vec3 uAway;      // unit: from the Sun
-  uniform vec3 uLag;       // unit: opposite the comet's motion
-  uniform float uLength;
-  uniform float uWidth;
-  uniform float uCurve;    // 0 for the straight ion tail
-  varying float vAlong;
-  varying float vAcross;
-  void main() {
-    float t = position.x;
-    vec3 p = uHead + uAway * uLength * t + uLag * uLength * uCurve * t * t;
-    vec3 tangent = normalize(uAway + uLag * uCurve * 2.0 * t + 1e-4);
-    vec3 view = normalize(cameraPosition - p);
-    vec3 side = normalize(cross(tangent, view));
-    p += side * position.y * uWidth * (0.25 + 1.6 * t);
-    vAlong = t;
-    vAcross = position.y;
-    gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
-  }
-`
-const tailFragment = /* glsl */ `
-  uniform vec3 uColor;
-  uniform float uStrength;
-  varying float vAlong;
-  varying float vAcross;
-  void main() {
-    float a = exp(-vAcross * vAcross * 3.0) * pow(1.0 - vAlong, 1.6) * smoothstep(0.0, 0.04, vAlong) * uStrength;
-    if (a < 0.003) discard;
-    gl_FragColor = vec4(uColor * a, a);
-  }
-`
 const comaFragment = /* glsl */ `
   uniform vec3 uColor;
   uniform float uStrength;
@@ -400,32 +369,6 @@ const comaFragment = /* glsl */ `
     gl_FragColor = vec4(uColor * a, a);
   }
 `
-const TAIL_GEOMETRY = (() => {
-  const g = new THREE.PlaneGeometry(1, 2, 24, 1)
-  g.translate(0.5, 0, 0)
-  return g
-})()
-
-function tailMaterial(color, curve) {
-  return new THREE.ShaderMaterial({
-    vertexShader: tailVertex,
-    fragmentShader: tailFragment,
-    uniforms: {
-      uHead: { value: new THREE.Vector3() },
-      uAway: { value: new THREE.Vector3(1, 0, 0) },
-      uLag: { value: new THREE.Vector3(0, 0, 1) },
-      uLength: { value: 1 },
-      uWidth: { value: 0.05 },
-      uCurve: { value: curve },
-      uColor: { value: new THREE.Color(color) },
-      uStrength: { value: 0 },
-    },
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  })
-}
-
 const before = new THREE.Vector3()
 const away = new THREE.Vector3()
 const lag = new THREE.Vector3()
@@ -478,8 +421,7 @@ function SmallBody({ body, selected, onSelect, onRegister, showOrbit, dwarfMater
 
     smallBodyPosition(body.elements, jd, tmp)
     const rAu = Math.hypot(tmp[0], tmp[1], tmp[2])
-    // Activity: none beyond 5 AU, rising roughly as 1/r^2 towards the Sun.
-    const activity = Math.min(1, Math.max(0, (5 - rAu) / 4.5) * Math.min(1.6, 1.2 / (rAu * rAu)))
+    const activity = cometActivity(rAu)
     // Direction of motion from a position a day earlier.
     placeSmallBody(body.elements, jd - Math.max(1, body.elements.periodDays / 2000), before)
     const head = groupRef.current.position

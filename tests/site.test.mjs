@@ -12,6 +12,7 @@ import orbitsData from '../src/data/catalogue/orbits.json' with { type: 'json' }
 import trajectoriesData from '../src/data/catalogue/trajectories.json' with { type: 'json' }
 import { eclipseState, julianDate, moonPosition, planetPosition, solveKepler } from '../src/lib/orbits.js'
 import { EFFECT_DEFAULTS } from '../src/lib/effects.js'
+import { cometActivity } from '../src/lib/cometTail.js'
 import { GALAXIES } from '../src/data/galaxies.js'
 import { NEBULAE } from '../src/data/nebulae.js'
 import { TOUR_STOPS } from '../src/data/tour.js'
@@ -506,6 +507,15 @@ test('open universe: every catalogued object is placed, from JPL and SIMBAD data
     const host = byId[planet.parent]
     assert.ok(Math.abs(Math.hypot(...planet.pos.map((v, i) => v - host.pos[i])) / ow.KM_PER_AU - planet.entry.semiMajorAu) < planet.entry.semiMajorAu * 0.01, planet.id)
   }
+})
+
+test('comet tails: activity model, and comets tagged with their JPL elements', () => {
+  assert.equal(cometActivity(5.5), 0)
+  assert.equal(cometActivity(0.5), 1)
+  assert.ok(cometActivity(1.5) > cometActivity(3) && cometActivity(3) > 0)
+  const comets = wc.getWorld().objects.filter((o) => o.comet)
+  assert.deepEqual(comets.map((o) => o.id).sort(), SMALL_BODIES.filter((b) => b.kind === 'comet').map((b) => b.id).sort())
+  for (const c of comets) assert.match(c.entry.note, /Tails are a model/)
 })
 
 test('open universe: real spacecraft speeds come from the Horizons tracks', () => {

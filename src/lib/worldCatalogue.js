@@ -241,7 +241,7 @@ function solarObjects() {
       name: body.name,
       type: 'small',
       class: kind,
-      note: `${kind} on its JPL Small-Body Database orbit.`,
+      note: `${kind} on its JPL Small-Body Database orbit.${body.kind === 'comet' ? ' Tails are a model: pointed from the Sun and back along the orbit, with illustrative length and brightness.' : ''}`,
       distanceLy: 0,
       radiusKm: body.radiusKm,
       periodDays: el.periodDays,
@@ -254,6 +254,8 @@ function solarObjects() {
         radiusKm: body.radiusKm ?? 2,
         sizeNote: body.radiusKm ? null : MODEL_SIZE,
         render: 'body',
+        // Comets carry their elements so the scene can grow tails (a model).
+        comet: body.kind === 'comet' ? el : null,
         update(jd, pos) {
           atAu(smallBodyPosition(el, jd, scratch), pos)
         },

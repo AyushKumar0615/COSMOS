@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import Astronaut from '../components/3d/open/Astronaut.jsx'
 import Belts from '../components/3d/open/Belts.jsx'
+import CometTails from '../components/3d/open/CometTails.jsx'
 import DetailBodies, { beaconColor } from '../components/3d/open/DetailBodies.jsx'
 import PointLayer from '../components/3d/open/PointLayer.jsx'
 import Sky from '../components/3d/open/Sky.jsx'
@@ -414,6 +415,7 @@ export default function OpenUniverse({ reducedMotion }) {
       <PointLayer capacity={fieldCapacity} layer={field} renderOrder={-20} />
       <PointLayer capacity={n} layer={beacons} renderOrder={-10} />
       <Belts />
+      <CometTails world={world} />
       <SpaceDust reducedMotion={reducedMotion} />
       <primitive object={route} />
       <DetailBodies list={detail} world={world} view={view} reducedMotion={reducedMotion} outside={outside} />
