@@ -114,6 +114,8 @@ export default function OpenUniverse({ reducedMotion }) {
       px: new Float32Array(n),
       centreDir: [1, 0, 0],
       inside: 1,
+      lensDir: [1, 0, 0],
+      lensEps: 0,
     }),
     [n],
   )
@@ -164,6 +166,7 @@ export default function OpenUniverse({ reducedMotion }) {
 
   const colors = useMemo(() => world.objects.map((obj) => beaconColor(obj, TYPE_LOOK[obj.type]?.color ?? '#ffffff')), [world])
   const milkyWay = world.byId['milky-way']
+  const blackHoles = useMemo(() => world.objects.filter((obj) => obj.render === 'blackhole'), [world])
   const disc = useMemo(() => discFor(milkyWay), [milkyWay])
   const realStars = useMemo(
     () => world.objects.filter((o) => o.render === 'star' && o.id !== 'sun').map((o) => o.pos.map((v) => v / KM_PER_LY)),
@@ -346,6 +349,19 @@ export default function OpenUniverse({ reducedMotion }) {
     const heightLy = Math.abs(ship.pos[1] - milkyWay.pos[1]) / KM_PER_LY
     outside.current = Math.max(smoothstep(42000, 85000, fromCentreLy), smoothstep(5000, 22000, heightLy))
     view.inside = 1 - outside.current
+
+    // The black hole that bends the sky most: the largest Rs / distance.
+    view.lensEps = 0
+    for (const obj of blackHoles) {
+      const eps = obj.horizon ? obj.radiusKm / view.d[obj.index] : 0
+      if (eps <= view.lensEps) continue
+      const i = obj.index * 3
+      const r = renderDistance(view.d[obj.index])
+      view.lensEps = Math.min(eps, 0.2)
+      view.lensDir[0] = view.rp[i] / r
+      view.lensDir[1] = view.rp[i + 1] / r
+      view.lensDir[2] = view.rp[i + 2] / r
+    }
 
     // Light: the brightest star in the sky lights the astronaut and nearby worlds.
     let brightest = null

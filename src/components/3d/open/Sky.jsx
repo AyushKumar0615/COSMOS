@@ -15,7 +15,26 @@ const fragmentShader = /* glsl */ `
   ${NOISE_GLSL}
   uniform vec3 uCentre;   // direction to the Galactic Centre from the ship
   uniform float uInside;  // 1 inside the disc, 0 far outside the galaxy
+  uniform vec3 uLens;     // direction to the strongest black hole
+  uniform float uLensEps; // its Schwarzschild radius over its distance
   varying vec3 vDir;
+
+  // Weak-field point-mass lens for a source at infinity: light passing at
+  // angle theta is bent by 2 Rs / b, so it comes from beta = theta - 2 eps / theta.
+  // Inside the shadow (about 2.6 Rs, the photon-capture radius) no light arrives.
+  vec3 lensed(vec3 dir, out float shadow) {
+    shadow = 0.0;
+    if (uLensEps <= 0.0) return dir;
+    float c = dot(dir, uLens);
+    vec3 across = dir - uLens * c;
+    float s = length(across);
+    float theta = atan(s, c);
+    float edge = 2.598 * uLensEps;
+    shadow = 1.0 - smoothstep(edge * 0.97, edge * 1.03, theta);
+    if (s < 1e-7) return dir;
+    float beta = theta - 2.0 * uLensEps / max(theta, 1e-7);
+    return uLens * cos(beta) + (across / s) * sin(beta);
+  }
 
   float hash31(vec3 p) {
     p = fract(p * 0.1031);
@@ -40,7 +59,8 @@ const fragmentShader = /* glsl */ `
   }
 
   void main() {
-    vec3 dir = normalize(vDir);
+    float shadow;
+    vec3 dir = lensed(normalize(vDir), shadow);
     // The galactic plane is the world's XZ plane: |y| is sin(latitude).
     float lat = dir.y;
     float band = exp(-pow(lat / 0.13, 2.0));
@@ -56,7 +76,7 @@ const fragmentShader = /* glsl */ `
 
     vec3 field = stars(dir, 90.0, 0.06, 0.045) * 0.55 + stars(dir, 220.0, 0.05 + band * 0.12, 0.09) * 0.32;
     vec3 colour = (glow * 0.55 + field) * uInside;
-    gl_FragColor = vec4(colour, 1.0);
+    gl_FragColor = vec4(colour * (1.0 - shadow), 1.0);
   }
 `
 
@@ -66,6 +86,7 @@ const SPHERE = new THREE.SphereGeometry(1, 48, 32)
  * The Milky Way seen from inside it: a faint band in the galactic plane,
  * brightest toward the centre, with unresolved background stars. It fades
  * away as the ship leaves the disc, where the galaxy model takes over.
+ * The nearest black hole bends it (weak-field lensing, a model).
  * A procedural model, not a photograph.
  */
 export default function Sky({ state }) {
@@ -74,7 +95,12 @@ export default function Sky({ state }) {
       new THREE.ShaderMaterial({
         vertexShader,
         fragmentShader,
-        uniforms: { uCentre: { value: new THREE.Vector3(1, 0, 0) }, uInside: { value: 1 } },
+        uniforms: {
+          uCentre: { value: new THREE.Vector3(1, 0, 0) },
+          uInside: { value: 1 },
+          uLens: { value: new THREE.Vector3(1, 0, 0) },
+          uLensEps: { value: 0 },
+        },
         side: THREE.BackSide,
         depthWrite: false,
         depthTest: false,
@@ -85,6 +111,8 @@ export default function Sky({ state }) {
   useFrame(() => {
     material.uniforms.uCentre.value.set(...state.current.centreDir)
     material.uniforms.uInside.value = state.current.inside
+    material.uniforms.uLens.value.set(...state.current.lensDir)
+    material.uniforms.uLensEps.value = state.current.lensEps
   })
   return <mesh geometry={SPHERE} material={material} scale={30000} renderOrder={-100} frustumCulled={false} raycast={() => null} />
 }

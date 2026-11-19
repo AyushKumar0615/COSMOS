@@ -142,8 +142,9 @@ const SHADOW = new THREE.SphereGeometry(1, 40, 28)
 
 /**
  * A black hole: the shadow (about 2.6 horizon radii, the photon-capture
- * radius of a non-spinning hole) and a thin accretion disc. A visual model;
- * the Black Hole Explorer ray-traces the real lensing.
+ * radius of a non-spinning hole) and a thin accretion disc. The sky behind
+ * is bent by weak-field lensing in the sky shader; the disc itself is not
+ * lensed here. The Black Hole Explorer ray-traces the full picture.
  */
 function BlackHole({ obj, view }) {
   const ref = usePlacement(view, obj, obj.radiusKm)
