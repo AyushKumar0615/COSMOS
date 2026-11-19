@@ -6,7 +6,7 @@ COSMOS is an interactive 3D universe exploration website built with React, Three
 Project directory: `~/Documents/projects/COSMOS`
 
 ## Development Status
-Phases 1–8 are completed, plus the Black Hole Explorer, new destinations, the Phenomena lab, the realism upgrade and the overnight solar-system evolution (moons, small bodies, real dates, eclipses, Horizons probes). All of it is committed on local `main` (not yet pushed to GitHub); the open universe is on the local branch `open-universe`, awaiting review. The private Vercel build predates all of it. Progress and checkpoints: `COSMOS_OVERNIGHT_PROGRESS.md`, `COSMOS_OVERNIGHT_TODO.md`, `COSMOS_OVERNIGHT_FINAL_REPORT.md`.
+Phases 1–8 are completed, plus the Black Hole Explorer, new destinations, the Phenomena lab, the realism upgrade and the overnight solar-system evolution (moons, small bodies, real dates, eclipses, Horizons probes). Phases 1–8, the open universe and its follow-ups are merged into `main` and pushed to GitHub (`origin/main`). Nothing is deployed: the private Vercel build predates all of it. Commits use the repository-local identity Ayush Kumar <ayushkumarbtech25@rvu.edu.in>, with no AI co-author trailers. Progress and checkpoints: `COSMOS_OVERNIGHT_PROGRESS.md`, `COSMOS_OVERNIGHT_TODO.md`, `COSMOS_OVERNIGHT_FINAL_REPORT.md`.
 
 ### Completed Features
 - Interactive landing page and universe entry.
