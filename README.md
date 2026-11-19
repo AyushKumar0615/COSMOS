@@ -265,7 +265,10 @@ npm run lint      # oxlint
 `npm run catalogue` re-fetches the archive data into
 `src/data/catalogue/measured.json`, and `npm run orbits` re-fetches JPL orbital
 elements and Horizons spacecraft tracks into `src/data/catalogue/orbits.json`
-and `trajectories.json`. It is run by hand and the result reviewed:
+and `trajectories.json`. `npm run extras` fetches constellation figures
+(d3-celestial), Mars rover positions (NASA's rover maps) and ISS/Hubble
+elements (Horizons) into `constellations.json` and `extras.json`. Each is run
+by hand and the result reviewed:
 the site never contacts these services at runtime, and the build does not
 either.
 
@@ -749,9 +752,12 @@ and add a `photo` field to that mission in `src/data/missions.js`.
   the atlas's lighter surfaces rather than the solar scene's full materials.
   Procedural field stars and the Milky Way band are models. Speeds above
   light speed are a convenience, not physics, and are labelled so.
-- The atlas places stars with galactic longitude 90° on +Z, a mirror image of
-  the sky in a right-handed renderer; the open universe uses the correct
-  orientation. Distances in the atlas are unaffected.
+- Earth-orbit spacecraft in the open universe (ISS, Hubble) are propagated
+  on a fixed orbit from JPL Horizons elements and shown only for one day after
+  `npm run extras` fetched them; the error grows to hundreds of km a day.
+- Mars rover positions are listed in Mars's panel, not drawn on the globe,
+  whose surface is a model. Constellation figures are a cultural convention
+  over measured star directions, shown only near the Sun.
 - Curved spacetime is an analogy, with depths compressed for comparison.
 - Wormholes are hypothetical, and the far side's grid is invented.
 - Carina's Homunculus is drawn larger than scale so it is visible, and

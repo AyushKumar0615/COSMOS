@@ -32,6 +32,7 @@ Phases 1–8 are completed, plus the Black Hole Explorer, new destinations, the 
 - Solar system evolution: 20 moons, Pluto–Charon, dwarf planets, asteroids, comets, asteroid and Kuiper belts (`SolarExtras.jsx`, lazy); shared clock with real dates 1800–2050 (`lib/simClock.js`, `lib/orbits.js`, `TimePanel.jsx`); eclipses from real geometry; auroras (`Aurora.jsx`); CMEs; Find panel; body panels with JPL sources.
 - Deep-space probes from JPL Horizons (Voyager 1/2, New Horizons, Parker; `Probes.jsx`, `lib/trajectories.js`, lazy) and Juno at Jupiter. Not live tracking.
 - Open universe (`scene: 'open'`, nav "Open Universe"): one continuous galactic-coordinate world with a floating origin and compressed depth (`lib/openWorld.js`, `lib/worldCatalogue.js`, `lib/openWorldStore.js`, `scenes/OpenUniverse.jsx`, `components/3d/open/*`, `components/interface/open/*`, all lazy); astronaut, six-direction flight, speed presets, discovery HUD, markers, radar, autopilot, map, bookmarks and saved places. Progress: `COSMOS_OPEN_WORLD_PROGRESS.md`.
+- Atlas mirror fixed (`galacticToScene`); sourced extras via `npm run extras`: constellation overlay, Mars rover positions, ISS/Hubble for one day after retrieval.
 - Automated tests: `npm test` and `npm run test:browser`.
 
 ## Data Rules

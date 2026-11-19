@@ -227,6 +227,26 @@ Branch `main`; local commits allowed, nothing pushed or deployed.
   the toolbar; stronger marker label shadows.
 - Commits: `1947f7f`, `ade3391`. Unit 36/36; lint 0 errors; full browser suite 38/38 on the final build; 60 fps in every scene; heap 14.2 → 14.1 MB; first contentful paint 164 ms.
 
+## Cycle M — atlas mirror fix and sourced extras (2026-11-19)
+
+- Atlas mirror (approved): `truePosition` and `mapPosition` used
+  z = +r·cos b·sin l, a reflection (determinant −1). Both now call
+  `galacticToScene` (z = −r·cos b·sin l), a rotation of the right-handed
+  galactic frame into the Y-up scene. Distances, nearby lists, map radii,
+  selection and fly-to are unchanged (they read the same positions).
+  Before/after: Cygnus X-1 (l ≈ 71°) moved from the near side to the far side
+  with the Galactic Centre on the right, i.e. the view from the north
+  galactic pole, as it should be. Tests: handedness (x × y = z), sign of z
+  for every catalogued object, invariants, the open world now agrees on all
+  three axes.
+- `npm run extras` (`scripts/build-extras.mjs`): constellation figures
+  (`constellations.json`, d3-celestial, BSD-3), rover positions and ISS/Hubble
+  elements (`extras.json`). Constellations: open-universe overlay, off by
+  default, fades out beyond 15–60 ly. Rovers: Mars's panel. Orbiters: open
+  universe for one day after retrieval (error measured against Horizons
+  vectors: ISS 122/300/840 km and Hubble 254/975/2,832 km after 0.25/1/3 days).
+- Commit `bf86533`. Unit 40/40; lint 0 errors; full browser suite 38/38 on the final build (atlas search, system view and navigation included); 60 fps in every scene; heap 14.4 → 14.2 MB.
+
 Next task: none independently actionable; see "Needs a decision or data from
 the user" in `COSMOS_OVERNIGHT_TODO.md`.
 
