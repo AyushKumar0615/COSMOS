@@ -594,15 +594,28 @@ test('extras: rover positions and Earth orbiters are sourced and plausible', () 
     assert.ok(Math.abs(r.lat) < 90 && r.lonEast >= -180 && r.lonEast <= 360 && r.sol > 0, r.id)
     assert.match(r.source.url, /^https:\/\/mars\.nasa\.gov\//)
   }
+  assert.deepEqual(extrasData.orbiters.map((o) => o.id).sort(), ['hubble', 'iss', 'tiangong'])
+  const earthKm = CATALOGUE_BY_ID.earth.radiusKm
   for (const el of extrasData.orbiters) {
-    const p = wc.orbiterPosition(el, el.epochJd)
-    const r = Math.hypot(...p)
-    // On its own ellipse at the epoch.
-    assert.ok(r >= el.aKm * (1 - el.e) - 1e-6 && r <= el.aKm * (1 + el.e) + 1e-6, el.id)
-    // Shown only while fresh.
-    assert.ok(wc.orbitersFor(el.epochJd + 0.5).includes(el))
-    assert.ok(!wc.orbitersFor(el.epochJd + wc.ORBITER_DAYS + 0.01).includes(el))
+    assert.match(el.line1, /^1 /)
+    assert.match(el.line2, /^2 /)
+    const epoch = wc.orbiterEpochJd(el)
+    // Low Earth orbit at the epoch and a day later.
+    for (const jd of [epoch, epoch + 1]) {
+      const altitude = Math.hypot(...wc.orbiterPosition(el, jd)) - earthKm
+      assert.ok(altitude > 250 && altitude < 700, `${el.id} altitude ${altitude}`)
+    }
+    // Shown only while the TLE is fresh.
+    assert.ok(wc.orbitersFor(epoch + 0.5).includes(el))
+    assert.ok(!wc.orbitersFor(epoch + wc.ORBITER_DAYS + 0.01).includes(el))
   }
+  // Precession to J2000: identity at J2000, a rotation, about 50 arcsec a year since.
+  const x = [7000, 0, 0]
+  assert.deepEqual(wc.precessToJ2000(x, 2451545).map((v) => Math.round(v * 1e6) / 1e6), [7000, 0, 0])
+  const later = wc.precessToJ2000(x, 2451545 + 26 * 365.25)
+  assert.ok(Math.abs(Math.hypot(...later) - 7000) < 1e-6)
+  const degrees = (Math.acos(later[0] / 7000) * 180) / Math.PI
+  assert.ok(degrees > 0.3 && degrees < 0.42, `precession ${degrees}°`)
 })
 
 test('open universe: real spacecraft speeds come from the Horizons tracks', () => {

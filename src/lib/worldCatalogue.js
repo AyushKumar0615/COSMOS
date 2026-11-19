@@ -5,7 +5,8 @@ import { GALAXIES_BY_ID } from '../data/galaxies.js'
 import { NEBULAE_BY_ID } from '../data/nebulae.js'
 import { BLACK_HOLES } from '../data/blackholes.js'
 import { SATELLITES, isProbe } from '../data/satellites.js'
-import { julianDate, moonPosition, planetPosition, positionFromElements, smallBodyPosition } from './orbits.js'
+import { propagate, twoline2satrec } from 'satellite.js'
+import { julianDate, moonPosition, planetPosition, smallBodyPosition } from './orbits.js'
 import EXTRAS from '../data/catalogue/extras.json' with { type: 'json' }
 import { trajectoryPosition, trajectoryRange } from './trajectories.js'
 import { starLook } from './bodyVisuals.js'
@@ -173,19 +174,54 @@ function atAu(au, out) {
   return out
 }
 
-// Two-body elements drift fast in low Earth orbit: checked against Horizons
-// vectors, the error reached hundreds of km (ISS) to about 1,000 km (Hubble)
-// after one day, so nothing is shown beyond that.
-export const ORBITER_DAYS = 1
+// SGP4 from a fresh TLE stays within a few km for days; the error grows with
+// the TLE's age (drag), so nothing is shown beyond this window.
+export const ORBITER_DAYS = 14
 
-/** Earth-orbit spacecraft whose elements are within ORBITER_DAYS of `jd`. */
-export const orbitersFor = (jd) => EXTRAS.orbiters.filter((el) => Math.abs(jd - el.epochJd) <= ORBITER_DAYS)
+const satrecs = new Map()
+function satrecFor(el) {
+  if (!satrecs.has(el.id)) satrecs.set(el.id, twoline2satrec(el.line1, el.line2))
+  return satrecs.get(el.id)
+}
+export const orbiterEpochJd = (el) => {
+  const rec = satrecFor(el)
+  return rec.jdsatepoch + (rec.jdsatepochF ?? 0)
+}
 
-/** Geocentric equatorial position (km) on the osculating orbit at `jd`. */
+/** Earth-orbit spacecraft whose TLE is within ORBITER_DAYS of `jd`. */
+export const orbitersFor = (jd) => EXTRAS.orbiters.filter((el) => Math.abs(jd - orbiterEpochJd(el)) <= ORBITER_DAYS)
+
+/**
+ * Precession from the mean equator and equinox of date to J2000 (IAU 1976,
+ * Lieske et al.): the transpose of P(T). SGP4's TEME frame differs from mean
+ * of date only by nutation, under 1 km in low Earth orbit.
+ */
+export function precessToJ2000(v, jd, out = [0, 0, 0]) {
+  const T = (jd - 2451545) / 36525
+  const as = Math.PI / (180 * 3600)
+  const zeta = (2306.2181 * T + 0.30188 * T * T + 0.017998 * T ** 3) * as
+  const z = (2306.2181 * T + 1.09468 * T * T + 0.018203 * T ** 3) * as
+  const th = (2004.3109 * T - 0.42665 * T * T - 0.041833 * T ** 3) * as
+  const [cz, sz, cZ, sZ, ct, st] = [Math.cos(zeta), Math.sin(zeta), Math.cos(z), Math.sin(z), Math.cos(th), Math.sin(th)]
+  const P = [
+    [cz * ct * cZ - sz * sZ, -sz * ct * cZ - cz * sZ, -st * cZ],
+    [cz * ct * sZ + sz * cZ, -sz * ct * sZ + cz * cZ, -st * sZ],
+    [cz * st, -sz * st, ct],
+  ]
+  const [x, y, w] = v
+  out[0] = P[0][0] * x + P[1][0] * y + P[2][0] * w
+  out[1] = P[0][1] * x + P[1][1] * y + P[2][1] * w
+  out[2] = P[0][2] * x + P[1][2] * y + P[2][2] * w
+  return out
+}
+
+/** Geocentric J2000 equatorial position (km) by SGP4 at `jd` (UTC); null if SGP4 fails. */
 export function orbiterPosition(el, jd, out = [0, 0, 0]) {
-  // shortcut: epoch is TDB and jd is UTC (about a minute apart); negligible next to two-body drift.
-  const M = el.meanAnomalyDeg + el.meanMotionDegPerS * (jd - el.epochJd) * 86400
-  return positionFromElements(el.aKm, el.e, el.iDeg, el.nodeDeg, el.periDeg, M, out)
+  const result = propagate(satrecFor(el), new Date((jd - 2440587.5) * 86400000))
+  const p = result?.position
+  if (!p || typeof p === 'boolean') return null
+  // shortcut: precession takes UTC for TT (about a minute apart); negligible here.
+  return precessToJ2000([p.x, p.y, p.z], jd, out)
 }
 
 /** Tilt a moon's equatorial orbit by its planet's obliquity, about the ecliptic X axis. */
@@ -303,9 +339,9 @@ function solarObjects() {
         radiusKm: 0.05,
         render: 'probe',
         parent: 'earth',
-        positionNote: `Approximate: propagated on a fixed (two-body) orbit from JPL Horizons elements of ${EXTRAS.retrieved}. Drag and Earth's oblateness are not modelled; the error grows to hundreds of km within a day, so it is shown only for ${ORBITER_DAYS} day after that.`,
+        positionNote: `Position by SGP4 from the CelesTrak two-line elements fetched ${EXTRAS.retrieved}. Accurate to a few km near that date, approximate later; shown for ${ORBITER_DAYS} days. Not live tracking.`,
         update(jd, pos) {
-          orbiterPosition(el, jd, scratch)
+          if (!orbiterPosition(el, jd, scratch)) return
           equatorialToWorld(scratch[0], scratch[1], scratch[2], pos)
           for (let i = 0; i < 3; i += 1) pos[i] += earthObj.pos[i]
         },

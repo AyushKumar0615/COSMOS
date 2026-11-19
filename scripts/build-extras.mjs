@@ -1,5 +1,5 @@
 // Fetches the sourced extras: constellation figures, Mars rover positions and
-// Earth-orbit spacecraft elements. Writes src/data/catalogue/constellations.json
+// Earth-orbit spacecraft two-line elements. Writes src/data/catalogue/constellations.json
 // (figure lines, larger) and extras.json (rovers and orbiters, small).
 // Run with `npm run extras`. Nothing here is typed in by hand.
 import fs from 'node:fs'
@@ -56,44 +56,21 @@ async function rovers() {
   return out
 }
 
-// --- Earth-orbit spacecraft: osculating elements from JPL Horizons --------------------------
+// --- Earth-orbit spacecraft: two-line elements from CelesTrak (for SGP4) --------------------
 const ORBITERS = [
-  { id: 'iss', command: '-125544' },
-  { id: 'hubble', command: '-48' },
+  { id: 'iss', norad: 25544 },
+  { id: 'hubble', norad: 20580 },
+  { id: 'tiangong', norad: 48274 }, // the station's Tianhe core module
 ]
 async function orbiters() {
   const out = []
-  const start = new Date()
-  const stop = new Date(start.getTime() + 3600e3)
-  const fmt = (d) => d.toISOString().slice(0, 16).replace('T', ' ')
   for (const craft of ORBITERS) {
-    const params = new URLSearchParams({
-      format: 'json',
-      COMMAND: `'${craft.command}'`,
-      OBJ_DATA: "'NO'",
-      MAKE_EPHEM: "'YES'",
-      EPHEM_TYPE: "'ELEMENTS'",
-      CENTER: "'500@399'",
-      REF_PLANE: "'FRAME'", // Earth's mean equator and equinox of J2000 (ICRF)
-      START_TIME: `'${fmt(start)}'`,
-      STOP_TIME: `'${fmt(stop)}'`,
-      STEP_SIZE: "'1h'",
-    })
-    const result = (await json(`https://ssd.jpl.nasa.gov/api/horizons.api?${params}`)).result
-    const block = result.slice(result.indexOf('$$SOE') + 5, result.indexOf('$$EOE'))
-    const field = (name) => Number(block.match(new RegExp(`${name}\\s*=\\s*([-+0-9.E]+)`))[1])
-    out.push({
-      id: craft.id,
-      epochJd: Number(block.trim().split(/\s+/)[0]),
-      e: field('EC'),
-      aKm: field(' A'),
-      iDeg: field('IN'),
-      nodeDeg: field('OM'),
-      periDeg: field('W '),
-      meanAnomalyDeg: field('MA'),
-      meanMotionDegPerS: field('N '),
-      source: { label: 'JPL Horizons osculating elements', url: 'https://ssd.jpl.nasa.gov/horizons/' },
-    })
+    const url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${craft.norad}&FORMAT=TLE`
+    const response = await fetch(url)
+    if (!response.ok) throw new Error(`${response.status} ${url}`)
+    const [name, line1, line2] = (await response.text()).trim().split(/\r?\n/).map((line) => line.trim())
+    if (!line1?.startsWith('1 ') || !line2?.startsWith('2 ')) throw new Error(`No TLE for ${craft.id}`)
+    out.push({ id: craft.id, norad: craft.norad, name, line1, line2, source: { label: 'CelesTrak two-line elements (SGP4)', url } })
   }
   return out
 }
