@@ -26,7 +26,7 @@ Done items move to COSMOS_OVERNIGHT_PROGRESS.md. Highest priority first.
 - **Rovers on the 3D globe:** needs a real Mars map and the IAU Mars rotation model in the data
   pipeline; today's Mars texture is procedural.
 - **Safari and real devices (item 12):** needs testing on your hardware.
-- **Merge / push / deploy:** branch `open-universe` is local and unmerged; nothing is pushed.
+- **Merge / push / deploy:** `main` is pushed (`5ab0e0b`). QA fixes are on the local branch `qa-preview` (not pushed or merged). A Vercel preview of `5ab0e0b` exists; production is unchanged.
 - **Refreshing data:** `npm run extras` updates rover positions, orbiter elements and
   constellations; `npm run catalogue` and `npm run orbits` as before.
 

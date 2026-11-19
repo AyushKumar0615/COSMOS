@@ -258,6 +258,18 @@ Branch `main`; local commits allowed, nothing pushed or deployed.
   (Horizons has no Tiangong record). Window: 14 days after the TLE epoch.
 - Commit `1350f8d`. Unit 40/40; lint 0 errors; full browser suite 38/38 on the final build; 60 fps in every scene.
 
+## Cycle O — QA of the Vercel preview (2026-11-19)
+
+- Preview deployment of `5ab0e0b` (not production), tested through a 23-hour
+  share link in real Chrome: browser suite 37 passed / 1 local-only skip,
+  60 fps everywhere, heap 14.5 → 14.2 MB, no console errors; extra QA tour of
+  the open universe, orbiters, comets, constellations and rover panels.
+- Fixed on branch `qa-preview` (`692b2ef`): orbiters claiming Earth's region,
+  phone notices over the discovery sheet, see-through phone menu, see-through
+  compact sheets; suite can target a share link (`COSMOS_SHARE`).
+- Local results on the fixes: unit 40/40, browser 38/38, lint 0 errors.
+- Report and screenshots: `qa/2026-11-19/` (local, not committed).
+
 Next task: none independently actionable; see "Needs a decision or data from
 the user" in `COSMOS_OVERNIGHT_TODO.md`.
 
