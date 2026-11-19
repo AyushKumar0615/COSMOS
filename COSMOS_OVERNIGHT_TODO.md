@@ -10,7 +10,7 @@ Done items move to COSMOS_OVERNIGHT_PROGRESS.md. Highest priority first.
 6. [x] Open universe: asteroid and Kuiper belts (labelled models); comet ion and dust tails (model, JPL positions).
 7. [x] Open universe: solar planets with the solar scene's full materials (night lights, clouds, bump).
 8. [x] Lensing: weak-field lensing of the sky around the strongest black hole (sky shader) plus the ray-traced hand-off. Not lensed: the accretion disc, beacons and field stars.
-9. [~] Earth-orbit spacecraft: ISS and Hubble from JPL Horizons osculating elements (`npm run extras`), two-body propagation, shown only for 1 day after retrieval (measured error: ~300 km ISS / ~1,000 km Hubble after a day). Staying visible needs a daily refresh or an SGP4 propagator with live TLEs (user decision).
+9. [x] Earth-orbit spacecraft: ISS, Hubble and Tiangong by SGP4 (satellite.js 6) from CelesTrak TLEs fetched by `npm run extras`, precessed TEME → J2000; within 0.3 km of JPL Horizons at the epoch and 1.7–6.4 km after 3 days; shown for 14 days after the TLE epoch.
 10. [x] Mars rovers: Perseverance and Curiosity latest localised positions from NASA's MMGIS rover maps, shown in Mars's panel (not on the globe, whose surface is a model).
 11. [x] Atlas mirror fixed (approved 2026-11-19): `galacticToScene` in `src/data/catalogue/index.js`, used by `truePosition` and `mapPosition`; regression tests added.
 12. [ ] Safari and real-device testing (needs the user).
@@ -22,9 +22,7 @@ Done items move to COSMOS_OVERNIGHT_PROGRESS.md. Highest priority first.
 
 ## Needs a decision or data from the user
 
-- **Earth orbiters staying visible (item 9):** either refresh `npm run extras` daily (a scheduled
-  job), or add an SGP4 propagator (e.g. the `satellite.js` package) with CelesTrak TLEs, which
-  stays accurate to a few km for days. Both need your choice; the second adds a dependency.
+- **Keeping orbiters current:** re-run `npm run extras` at least every 14 days (or schedule it); after that the orbiters are hidden rather than shown stale.
 - **Rovers on the 3D globe:** needs a real Mars map and the IAU Mars rotation model in the data
   pipeline; today's Mars texture is procedural.
 - **Safari and real devices (item 12):** needs testing on your hardware.

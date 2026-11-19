@@ -266,8 +266,8 @@ npm run lint      # oxlint
 `src/data/catalogue/measured.json`, and `npm run orbits` re-fetches JPL orbital
 elements and Horizons spacecraft tracks into `src/data/catalogue/orbits.json`
 and `trajectories.json`. `npm run extras` fetches constellation figures
-(d3-celestial), Mars rover positions (NASA's rover maps) and ISS/Hubble
-elements (Horizons) into `constellations.json` and `extras.json`. Each is run
+(d3-celestial), Mars rover positions (NASA's rover maps) and ISS, Hubble and
+Tiangong two-line elements (CelesTrak) into `constellations.json` and `extras.json`. Each is run
 by hand and the result reviewed:
 the site never contacts these services at runtime, and the build does not
 either.
@@ -752,9 +752,9 @@ and add a `photo` field to that mission in `src/data/missions.js`.
   the atlas's lighter surfaces rather than the solar scene's full materials.
   Procedural field stars and the Milky Way band are models. Speeds above
   light speed are a convenience, not physics, and are labelled so.
-- Earth-orbit spacecraft in the open universe (ISS, Hubble) are propagated
-  on a fixed orbit from JPL Horizons elements and shown only for one day after
-  `npm run extras` fetched them; the error grows to hundreds of km a day.
+- Earth-orbit spacecraft in the open universe (ISS, Hubble, Tiangong) are
+  propagated by SGP4 from CelesTrak TLEs and shown for 14 days after the TLE
+  epoch; re-run `npm run extras` to refresh them. Not live tracking.
 - Mars rover positions are listed in Mars's panel, not drawn on the globe,
   whose surface is a model. Constellation figures are a cultural convention
   over measured star directions, shown only near the Sun.

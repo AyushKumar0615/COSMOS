@@ -247,6 +247,17 @@ Branch `main`; local commits allowed, nothing pushed or deployed.
   vectors: ISS 122/300/840 km and Hubble 254/975/2,832 km after 0.25/1/3 days).
 - Commit `bf86533`. Unit 40/40; lint 0 errors; full browser suite 38/38 on the final build (atlas search, system view and navigation included); 60 fps in every scene; heap 14.4 → 14.2 MB.
 
+## Cycle N — SGP4 orbiters (approved 2026-11-19)
+
+- `satellite.js` 6.0.2 (MIT; 7.x bundles a WASM worker Vite cannot build).
+- `npm run extras` now fetches CelesTrak TLEs for ISS (25544), Hubble (20580)
+  and Tiangong's Tianhe module (48274) instead of Horizons osculating elements.
+- `orbiterPosition` (`lib/worldCatalogue.js`): SGP4, then TEME → J2000 by IAU
+  1976 precession (`precessToJ2000`). Against Horizons J2000 vectors: 0.3 km at
+  the epoch; ISS 1.4 / 6.4 km and Hubble 0.5 / 1.7 km after 1 / 3 days
+  (Horizons has no Tiangong record). Window: 14 days after the TLE epoch.
+- Commit `1350f8d`. Unit 40/40; lint 0 errors; full browser suite 38/38 on the final build; 60 fps in every scene.
+
 Next task: none independently actionable; see "Needs a decision or data from
 the user" in `COSMOS_OVERNIGHT_TODO.md`.
 
