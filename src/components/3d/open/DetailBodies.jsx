@@ -20,6 +20,7 @@ import { sunMarkerAngle } from '../../../lib/galaxyGenerator.js'
 import { GALAXIES_BY_ID } from '../../../data/galaxies.js'
 import { KM_PER_LY, eclipticToWorld } from '../../../lib/openWorld.js'
 import { scaleCount } from '../../../lib/quality.js'
+import { ROCK } from '../../../lib/cometTail.js'
 
 /**
  * Real meshes for whatever is near enough to show a disc or a shape. Each
@@ -68,6 +69,28 @@ function Body({ obj, view, reducedMotion }) {
       <group quaternion={SOLAR_TYPES.has(obj.type) ? ECLIPTIC : undefined}>
         <Surface visual={visual} size={1} reducedMotion={reducedMotion} />
       </group>
+    </group>
+  )
+}
+
+// Comet nuclei are among the darkest surfaces known (albedo about 0.04);
+// asteroids are grey rock. Both are irregular, unlike the round worlds.
+const NUCLEUS = new THREE.MeshStandardMaterial({ color: '#2e2a27', roughness: 1, metalness: 0 })
+const ASTEROID = new THREE.MeshStandardMaterial({ color: '#8a8178', roughness: 0.95, metalness: 0 })
+
+function SmallBody({ obj, view, reducedMotion }) {
+  const ref = usePlacement(view, obj, obj.radiusKm)
+  const spin = useRef(null)
+  useFrame((_, delta) => {
+    if (!reducedMotion && spin.current) spin.current.rotation.y += Math.min(delta, 0.1) * 0.05
+  })
+  return (
+    <group ref={ref}>
+      <group quaternion={ECLIPTIC}>
+        <mesh ref={spin} geometry={ROCK} material={obj.comet ? NUCLEUS : ASTEROID} raycast={() => null} />
+      </group>
+      {/* The inner coma round an active nucleus (a model). */}
+      {obj.comet && <GlowSprite size={14} color="#cfeee0" intensity={0.22} power={2.2} />}
     </group>
   )
 }
@@ -232,7 +255,8 @@ export default function DetailBodies({ list, world, view, reducedMotion, outside
     const props = { obj, view, reducedMotion }
     switch (obj.render) {
       case 'body':
-        return PLANETS_BY_ID[obj.id] ? <SolarPlanet key={obj.id} {...props} sun={world.byId.sun} /> : <Body key={obj.id} {...props} />
+        if (PLANETS_BY_ID[obj.id]) return <SolarPlanet key={obj.id} {...props} sun={world.byId.sun} />
+        return obj.type === 'small' ? <SmallBody key={obj.id} {...props} /> : <Body key={obj.id} {...props} />
       case 'star':
         return <Star key={obj.id} {...props} />
       case 'blackhole':

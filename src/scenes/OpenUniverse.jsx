@@ -164,6 +164,7 @@ export default function OpenUniverse({ reducedMotion }) {
     warnedLight: false,
     panels: [],
     panelsAt: 0,
+    anchor: null,
   })
 
   const colors = useMemo(() => world.objects.map((obj) => beaconColor(obj, TYPE_LOOK[obj.type]?.color ?? '#ffffff')), [world])
@@ -214,12 +215,22 @@ export default function OpenUniverse({ reducedMotion }) {
     L.worldTimer += raw
     if (L.worldTimer > 2) {
       L.worldTimer = 0
+      // Near a body the ship rides along in its frame, so a fast comet or
+      // moon does not slip away between refreshes.
+      const anchor = L.anchor && world.byId[L.anchor]
+      const was = anchor ? [...anchor.pos] : null
       updateWorld(world.objects, julianDate(Date.now()))
+      if (anchor) {
+        const far = Math.hypot(ship.pos[0] - was[0], ship.pos[1] - was[1], ship.pos[2] - was[2]) > anchor.stopKm * 40
+        if (far) L.anchor = null
+        else for (let i = 0; i < 3; i += 1) ship.pos[i] += anchor.pos[i] - was[i]
+      }
     }
 
     if (commands.reset !== L.seenReset) {
       L.seenReset = commands.reset
       L.ap = null
+      L.anchor = null
       placeAtStart(world)
       vel.set(0, 0, 0)
       setOpenSettings({ autopilot: false, paused: false })
@@ -245,7 +256,10 @@ export default function OpenUniverse({ reducedMotion }) {
     const manual = a.forward || a.right || a.up || stick.x || stick.y || input.vertical
     if (manual && L.ap) cancelAutopilot(L, 'manual')
     const target = s.targetId ? findTarget(s.targetId, getPlaces()) : null
-    if (s.autopilot && target && (!L.ap || L.ap.id !== target.id)) L.ap = startAutopilot(target, reducedMotion)
+    if (s.autopilot && target && (!L.ap || L.ap.id !== target.id)) {
+      L.ap = startAutopilot(target, reducedMotion)
+      L.anchor = null
+    }
     if (!s.autopilot && L.ap) L.ap = null
     if (s.autopilot && !target) setOpenSettings({ autopilot: false })
 
@@ -263,6 +277,7 @@ export default function OpenUniverse({ reducedMotion }) {
       ship.thrust = ap.t < 0.5 ? 0.8 : 0.1
       if (ap.t >= 1) {
         L.ap = null
+        L.anchor = world.byId[target.id] ? target.id : null
         vel.set(0, 0, 0)
         setOpenSettings({ autopilot: false })
         emitOpenEvent({ type: 'arrived', id: target.id, name: target.name })

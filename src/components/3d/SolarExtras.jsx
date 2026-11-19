@@ -19,7 +19,7 @@ import { bodyVisual } from '../../lib/bodyVisuals.js'
 import { reportEvents } from '../../lib/solarEvents.js'
 import { scaleCount } from '../../lib/quality.js'
 import { sampleBelt } from '../../lib/belts.js'
-import { TAIL_GEOMETRY, cometActivity, tailMaterial } from '../../lib/cometTail.js'
+import { ROCK, TAIL_GEOMETRY, comaMaterial, cometActivity, tailMaterial } from '../../lib/cometTail.js'
 
 const DEG = Math.PI / 180
 const AU_KM = 149597870.7
@@ -341,34 +341,9 @@ function SmallOrbit({ body, visible }) {
   return <lineLoop geometry={line.geometry} material={line.material} visible={visible} raycast={() => null} />
 }
 
-// An irregular rock shared by every asteroid and comet nucleus.
-const ROCK = (() => {
-  const g = new THREE.IcosahedronGeometry(1, 4)
-  const p = g.attributes.position
-  const v = new THREE.Vector3()
-  for (let k = 0; k < p.count; k += 1) {
-    v.fromBufferAttribute(p, k)
-    const bump = 1 + 0.2 * Math.sin(v.x * 3.1 + v.y * 1.7) * Math.cos(v.z * 2.3 - v.x) + 0.06 * Math.sin(v.y * 7 + v.z * 5) + 0.025 * Math.sin(v.x * 17 + v.z * 13)
-    v.multiplyScalar(bump)
-    p.setXYZ(k, v.x, v.y * 0.8, v.z)
-  }
-  g.computeVertexNormals()
-  return g
-})()
 const ROCK_MATERIAL = new THREE.MeshStandardMaterial({ color: '#8a8178', roughness: 0.95, metalness: 0 })
 const NUCLEUS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#3a3532', roughness: 1, metalness: 0 })
 
-const comaFragment = /* glsl */ `
-  uniform vec3 uColor;
-  uniform float uStrength;
-  varying vec2 vUv;
-  void main() {
-    float r = length(vUv - 0.5) * 2.0;
-    float a = (exp(-r * r * 8.0) + exp(-r * 3.0) * 0.3) * (1.0 - smoothstep(0.85, 1.0, r)) * uStrength;
-    if (a < 0.003) discard;
-    gl_FragColor = vec4(uColor * a, a);
-  }
-`
 const before = new THREE.Vector3()
 const away = new THREE.Vector3()
 const lag = new THREE.Vector3()
@@ -387,14 +362,7 @@ function SmallBody({ body, selected, onSelect, onRegister, showOrbit, dwarfMater
   const coma = useMemo(
     () =>
       comet
-        ? new THREE.ShaderMaterial({
-            vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-            fragmentShader: comaFragment,
-            uniforms: { uColor: { value: new THREE.Color('#bfe8ff') }, uStrength: { value: 0 } },
-            transparent: true,
-            depthWrite: false,
-            blending: THREE.AdditiveBlending,
-          })
+        ? comaMaterial('#bfe8ff')
         : null,
     [comet],
   )

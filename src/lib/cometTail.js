@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 /**
  * A comet tail as a camera-facing ribbon from the head: straight for the ion
@@ -68,3 +69,47 @@ export function tailMaterial(color, curve) {
 
 /** Comet activity: none beyond 5 AU, rising roughly as 1/r^2 towards the Sun (a model). */
 export const cometActivity = (rAu) => Math.min(1, Math.max(0, (5 - rAu) / 4.5) * Math.min(1.6, 1.2 / (rAu * rAu)))
+
+const comaFragment = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uStrength;
+  varying vec2 vUv;
+  void main() {
+    float r = length(vUv - 0.5) * 2.0;
+    float a = (exp(-r * r * 8.0) + exp(-r * 3.0) * 0.3) * (1.0 - smoothstep(0.85, 1.0, r)) * uStrength;
+    if (a < 0.003) discard;
+    gl_FragColor = vec4(uColor * a, a);
+  }
+`
+
+/** The coma: a soft camera-facing glow round the nucleus (a model). */
+export function comaMaterial(color) {
+  return new THREE.ShaderMaterial({
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: comaFragment,
+    uniforms: { uColor: { value: new THREE.Color(color) }, uStrength: { value: 0 } },
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+}
+
+// An irregular rock shared by every asteroid and comet nucleus.
+export const ROCK = (() => {
+  // Shared vertices, so the surface shades smoothly rather than in facets.
+  const base = new THREE.IcosahedronGeometry(1, 5)
+  base.deleteAttribute('normal')
+  base.deleteAttribute('uv')
+  const g = mergeVertices(base)
+  base.dispose()
+  const p = g.attributes.position
+  const v = new THREE.Vector3()
+  for (let k = 0; k < p.count; k += 1) {
+    v.fromBufferAttribute(p, k)
+    const bump = 1 + 0.2 * Math.sin(v.x * 3.1 + v.y * 1.7) * Math.cos(v.z * 2.3 - v.x) + 0.06 * Math.sin(v.y * 7 + v.z * 5) + 0.025 * Math.sin(v.x * 17 + v.z * 13) + 0.012 * Math.sin(v.y * 31 + v.x * 23) * Math.cos(v.z * 29)
+    v.multiplyScalar(bump)
+    p.setXYZ(k, v.x, v.y * 0.8, v.z)
+  }
+  g.computeVertexNormals()
+  return g
+})()

@@ -1,13 +1,16 @@
-import { useEffect, useMemo } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useEffect, useMemo, useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { TAIL_GEOMETRY, cometActivity, tailMaterial } from '../../../lib/cometTail.js'
+import { TAIL_GEOMETRY, comaMaterial, cometActivity, tailMaterial } from '../../../lib/cometTail.js'
 import { julianDate, smallBodyPosition } from '../../../lib/orbits.js'
 import { KM_PER_AU, eclipticToWorld, renderDistance } from '../../../lib/openWorld.js'
 import { ship } from '../../../lib/openWorldStore.js'
 
 // Model: the tail length drawn at full activity (illustrative, not measured).
 const MAX_TAIL_KM = 6e7
+// Model: coma radius at full activity (comae are typically 1e5–1e6 km).
+const MAX_COMA_KM = 3e5
+const QUAD = new THREE.PlaneGeometry(1, 1)
 const scratch = [0, 0, 0]
 const before = [0, 0, 0]
 const head = new THREE.Vector3()
@@ -32,7 +35,11 @@ function Tails({ obj }) {
     out.dust.premultipliedAlpha = true
     return out
   }, [])
-  useEffect(() => () => (tails.ion.dispose(), tails.dust.dispose()), [tails])
+  // Greenish: comae glow in the C2 Swan bands.
+  const coma = useMemo(() => Object.assign(comaMaterial('#c4f2dc'), { premultipliedAlpha: true }), [])
+  useEffect(() => () => (tails.ion.dispose(), tails.dust.dispose(), coma.dispose()), [tails, coma])
+  const comaRef = useRef(null)
+  const camera = useThree((state) => state.camera)
 
   useFrame(() => {
     const p = obj.pos
@@ -41,6 +48,7 @@ function Tails({ obj }) {
     if (activity <= 0) {
       tails.ion.uniforms.uStrength.value = 0
       tails.dust.uniforms.uStrength.value = 0
+      coma.uniforms.uStrength.value = 0
       return
     }
     const length = MAX_TAIL_KM * activity
@@ -54,6 +62,17 @@ function Tails({ obj }) {
     const ll = Math.hypot(lx, ly, lz) || 1
 
     toRender(p[0], p[1], p[2], head)
+    // Coma at its true angular size, facing the camera.
+    const m = comaRef.current
+    if (m) {
+      const d = Math.hypot(p[0] - ship.pos[0], p[1] - ship.pos[1], p[2] - ship.pos[2]) || 1
+      m.position.copy(head)
+      m.quaternion.copy(camera.quaternion)
+      const radius = MAX_COMA_KM * (0.3 + 0.7 * activity)
+      m.scale.setScalar(2 * radius * (renderDistance(d) / d))
+      // From inside, the coma is far too thin to see as a haze: fade it out.
+      coma.uniforms.uStrength.value = (0.25 + 0.75 * activity) * THREE.MathUtils.smoothstep(d, radius * 0.6, radius * 2.5)
+    }
     for (const [material, curve, width, strength] of [
       [tails.ion, 0, 0.025, 0.9],
       [tails.dust, 0.45, 0.07, 0.75],
@@ -79,12 +98,13 @@ function Tails({ obj }) {
     <>
       <mesh geometry={TAIL_GEOMETRY} material={tails.dust} frustumCulled={false} raycast={() => null} />
       <mesh geometry={TAIL_GEOMETRY} material={tails.ion} frustumCulled={false} raycast={() => null} />
+      <mesh ref={comaRef} geometry={QUAD} material={coma} frustumCulled={false} raycast={() => null} />
     </>
   )
 }
 
 /**
- * Ion and dust tails for the catalogued comets near the Sun, drawn in the
+ * Coma, ion and dust tails for the catalogued comets near the Sun, drawn in the
  * compressed open-universe space. The comets' positions are JPL's; the tails
  * are a model (direction from the Sun and the orbit, length and brightness
  * illustrative).

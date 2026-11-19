@@ -12,7 +12,7 @@ import orbitsData from '../src/data/catalogue/orbits.json' with { type: 'json' }
 import trajectoriesData from '../src/data/catalogue/trajectories.json' with { type: 'json' }
 import { eclipseState, julianDate, moonPosition, planetPosition, solveKepler } from '../src/lib/orbits.js'
 import { EFFECT_DEFAULTS } from '../src/lib/effects.js'
-import { cometActivity } from '../src/lib/cometTail.js'
+import { ROCK, comaMaterial, cometActivity } from '../src/lib/cometTail.js'
 import { GALAXIES } from '../src/data/galaxies.js'
 import { NEBULAE } from '../src/data/nebulae.js'
 import { TOUR_STOPS } from '../src/data/tour.js'
@@ -516,6 +516,11 @@ test('comet tails: activity model, and comets tagged with their JPL elements', (
   const comets = wc.getWorld().objects.filter((o) => o.comet)
   assert.deepEqual(comets.map((o) => o.id).sort(), SMALL_BODIES.filter((b) => b.kind === 'comet').map((b) => b.id).sort())
   for (const c of comets) assert.match(c.entry.note, /Tails are a model/)
+  // Nucleus shape shares vertices (smooth shading); the coma is additive and never writes depth.
+  assert.ok(ROCK.index && ROCK.attributes.normal)
+  const coma = comaMaterial('#ffffff')
+  assert.equal(coma.depthWrite, false)
+  coma.dispose()
 })
 
 test('open universe: star sizes inferred from measured brightness are labelled and plausible', () => {
