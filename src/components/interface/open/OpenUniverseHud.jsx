@@ -753,7 +753,7 @@ function Inspect({ id, places, discovery, onClose, onEngage, onFace, onExplore, 
         {(obj.positionNote || obj.sizeNote) && (
           <ul className="mt-3 space-y-1.5">
             {obj.positionNote && <li className="flex gap-2 text-[0.6875rem] font-light leading-snug text-ink-dim"><span className="readout shrink-0 text-[#c9b2ff]">{/illustrative|approximate/i.test(obj.positionNote) ? 'Model' : 'Observed'}</span>{obj.positionNote}</li>}
-            {obj.sizeNote && <li className="flex gap-2 text-[0.6875rem] font-light leading-snug text-ink-dim"><span className="readout shrink-0 text-[#c9b2ff]">{/horizon/i.test(obj.sizeNote) ? 'Theory' : 'Model'}</span>{obj.sizeNote}</li>}
+            {obj.sizeNote && <li className="flex gap-2 text-[0.6875rem] font-light leading-snug text-ink-dim"><span className="readout shrink-0 text-[#c9b2ff]">{/horizon/i.test(obj.sizeNote) ? 'Theory' : /inferred/i.test(obj.sizeNote) ? 'Inferred' : 'Model'}</span>{obj.sizeNote}</li>}
           </ul>
         )}
         {rows.length > 0 && (

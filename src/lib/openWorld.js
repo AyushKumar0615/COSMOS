@@ -230,3 +230,6 @@ export function magnitudeFromStar(radiusSun, temperatureK, sunTemperatureK) {
   return -2.5 * Math.log10(luminosity / L_ZERO_W)
 }
 export const SUN_ABS_MAG = -2.5 * Math.log10(L_SUN_W / L_ZERO_W)
+/** Inverse of magnitudeFromStar: the radius (in Suns) a star of this absolute magnitude and temperature has. */
+export const radiusFromMagnitude = (absMag, temperatureK, sunTemperatureK) =>
+  10 ** (-0.2 * (absMag - SUN_ABS_MAG)) * (sunTemperatureK / temperatureK) ** 2

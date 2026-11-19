@@ -16,6 +16,7 @@ import {
   absoluteMagnitude,
   eclipticToWorld,
   magnitudeFromStar,
+  radiusFromMagnitude,
   prng,
   raDecToWorld,
 } from './openWorld.js'
@@ -40,6 +41,7 @@ export const TYPE_LOOK = {
 }
 
 const MODEL_SIZE = 'Size drawn is a model: no measured size in the catalogue.'
+const INFERRED_SIZE = 'Size inferred from the measured magnitude, distance and temperature (Stefan–Boltzmann, no bolometric correction): approximate.'
 const lookOf = (type) => TYPE_LOOK[type] ?? TYPE_LOOK.star
 
 // --- Sizes ----------------------------------------------------------------------
@@ -75,10 +77,14 @@ function starObject(entry, posKm) {
   // Brightness: measured magnitude and distance first, else Stefan–Boltzmann.
   let absMag = entry.magnitude != null && entry.distanceLy ? absoluteMagnitude(entry.magnitude, entry.distanceLy) : null
   if (absMag == null && measuredRadius && entry.temperatureK) absMag = magnitudeFromStar(measuredRadius / SUN_RADIUS_KM, entry.temperatureK, SUN_TEFF)
+  // No measured radius: infer one from the measured brightness, distance and
+  // temperature (Stefan–Boltzmann). Visual magnitudes with no bolometric
+  // correction, so cool giants come out smaller than they are.
+  const inferred = !measuredRadius && entry.magnitude != null && entry.distanceLy && entry.temperatureK ? radiusFromMagnitude(absMag, entry.temperatureK, SUN_TEFF) : null
   return base(entry, {
     pos: posKm,
-    radiusKm: measuredRadius ?? SUN_RADIUS_KM * look.relative,
-    sizeNote: measuredRadius ? null : MODEL_SIZE,
+    radiusKm: measuredRadius ?? (inferred ? inferred * SUN_RADIUS_KM : SUN_RADIUS_KM * look.relative),
+    sizeNote: measuredRadius ? null : inferred ? INFERRED_SIZE : MODEL_SIZE,
     temperature: look.temperature,
     absMag: absMag ?? 2,
     render: 'star',

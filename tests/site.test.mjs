@@ -518,6 +518,21 @@ test('comet tails: activity model, and comets tagged with their JPL elements', (
   for (const c of comets) assert.match(c.entry.note, /Tails are a model/)
 })
 
+test('open universe: star sizes inferred from measured brightness are labelled and plausible', () => {
+  const { byId } = wc.getWorld()
+  // Inverse of magnitudeFromStar.
+  assert.ok(Math.abs(ow.radiusFromMagnitude(ow.magnitudeFromStar(3, 4500, 5772), 4500, 5772) - 3) < 1e-9)
+  assert.ok(Math.abs(ow.radiusFromMagnitude(ow.SUN_ABS_MAG, 5772, 5772) - 1) < 1e-9)
+  for (const id of ['sirius', 'vega', 'polaris', 'betelgeuse']) {
+    const star = byId[id]
+    if (star.entry.radiusKm) continue
+    assert.match(star.sizeNote, /inferred/i, id)
+  }
+  // Order of magnitude: a main-sequence star stays small, a supergiant large.
+  assert.ok(byId.sirius.radiusKm / 695700 < 3)
+  assert.ok(byId.betelgeuse.radiusKm / 695700 > 100)
+})
+
 test('open universe: real spacecraft speeds come from the Horizons tracks', () => {
   const speeds = Object.fromEntries(wc.referenceSpeeds(Date.UTC(2026, 10, 19)).map((r) => [r.id, r.kms]))
   assert.ok(speeds['voyager-1'] > 15 && speeds['voyager-1'] < 19, String(speeds['voyager-1']))
