@@ -141,9 +141,9 @@ export default function Navbar({ onNavigate, reducedMotion, activeId }) {
             id="mobile-nav"
             aria-label="Primary"
             // The list opens over the landing headline, so unlike the other glass
-            // surfaces it needs a near-opaque base to stay readable, and on a
+            // surfaces it needs an opaque base (at 97% the hero still showed), and on a
             // phone held sideways it is taller than the screen, so it scrolls.
-            className="pointer-events-auto glass mx-6 max-h-[calc(100dvh-6.5rem)] overflow-y-auto rounded-2xl bg-[#070a17]/[0.97] lg:ml-auto lg:mr-10 lg:w-80 xl:hidden"
+            className="pointer-events-auto glass mx-6 max-h-[calc(100dvh-6.5rem)] overflow-y-auto rounded-2xl bg-[#070a17] lg:ml-auto lg:mr-10 lg:w-80 xl:hidden"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}

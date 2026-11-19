@@ -431,8 +431,8 @@ export function buildWorld(now = Date.now()) {
   }
 
   for (const obj of objects) {
-    obj.influenceKm = influence(obj)
     obj.stopKm = stopDistance(obj)
+    obj.influenceKm = influence(obj)
   }
   updateWorld(objects, julianDate(now))
   return { objects, byId }
@@ -480,7 +480,9 @@ function influence(obj) {
     case 'star':
       return obj.id === 'sun' ? 150 * KM_PER_AU : Math.max(r * 2e4, 400 * KM_PER_AU)
     case 'probe':
-      return 1e6
+      // Deep-space probes are alone out there; a craft in Earth orbit must not
+      // claim Earth's neighbourhood as its own region.
+      return obj.parent ? obj.stopKm * 2 : 1e6
     default:
       return obj.type === 'moon' ? r * 40 : r * 300
   }

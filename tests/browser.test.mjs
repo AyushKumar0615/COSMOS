@@ -27,6 +27,7 @@ const VIEWPORTS = {
 
 let server
 let chrome
+let shareCookie = ''
 
 before(async () => {
   fs.rmSync(output, { recursive: true, force: true })
@@ -41,6 +42,15 @@ before(async () => {
     const page = await chrome.newPage(VIEWPORTS.desktop)
     await page.goto(`${server.origin}/?x-vercel-protection-bypass=${process.env.COSMOS_BYPASS}&x-vercel-set-bypass-cookie=true`)
     await page.close()
+  }
+  if (process.env.COSMOS_SHARE) {
+    // A Vercel share link (?_vercel_share=…) on the deployment's host: the
+    // browser keeps the cookie it sets, and plain fetches reuse it.
+    const page = await chrome.newPage(VIEWPORTS.desktop)
+    await page.goto(`${server.origin}/?_vercel_share=${process.env.COSMOS_SHARE}`)
+    await page.close()
+    const response = await globalThis.fetch(`${server.origin}/?_vercel_share=${process.env.COSMOS_SHARE}`, { redirect: 'manual' })
+    shareCookie = (response.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
   }
 })
 
@@ -1024,7 +1034,7 @@ test('still works when Google Fonts is unreachable', { timeout: 30000 }, async (
 })
 
 test('unknown paths fall back to the app; missing assets are real 404s', { timeout: 20000 }, async () => {
-  const headers = process.env.COSMOS_BYPASS ? { 'x-vercel-protection-bypass': process.env.COSMOS_BYPASS } : {}
+  const headers = process.env.COSMOS_BYPASS ? { 'x-vercel-protection-bypass': process.env.COSMOS_BYPASS } : shareCookie ? { cookie: shareCookie } : {}
   const fetch = (url) => globalThis.fetch(url, { headers })
   const deep = await fetch(`${server.origin}/some/deep/link`)
   assert.equal(deep.status, 200)

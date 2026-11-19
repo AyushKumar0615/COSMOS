@@ -644,7 +644,7 @@ function Discovery({ panel, setPanel, t, places, discovery, onPick, targetId, co
   return (
     <motion.aside
       aria-label="Discovery"
-      className={`glass pointer-events-auto absolute flex flex-col overflow-hidden rounded-3xl bg-[#070a17]/80 ${compact ? 'inset-x-3 bottom-3 max-h-[46vh]' : `${touch ? 'bottom-[13.5rem]' : 'bottom-28'} right-6 top-[31rem] w-[340px] lg:right-10`}`}
+      className={`glass pointer-events-auto absolute flex flex-col overflow-hidden rounded-3xl ${compact ? 'bg-[#070a17]/95 inset-x-3 bottom-3 max-h-[46vh]' : `bg-[#070a17]/80 ${touch ? 'bottom-[13.5rem]' : 'bottom-28'} right-6 top-[31rem] w-[340px] lg:right-10`}`}
       initial={{ opacity: 0, x: reducedMotion || compact ? 0 : 20, y: compact && !reducedMotion ? 20 : 0 }}
       animate={{ opacity: 1, x: 0, y: 0 }}
       exit={{ opacity: 0 }}
@@ -742,7 +742,7 @@ function Inspect({ id, places, discovery, onClose, onEngage, onFace, onExplore, 
   return (
     <motion.aside
       aria-label={`${obj.name} profile`}
-      className={`glass pointer-events-auto absolute flex flex-col overflow-hidden rounded-3xl bg-[#070a17]/88 ${compact ? 'inset-x-3 bottom-3 max-h-[58vh]' : `${touch ? 'bottom-[13.5rem]' : 'bottom-28'} right-6 top-[19.5rem] w-[340px] lg:right-10`}`}
+      className={`glass pointer-events-auto absolute flex flex-col overflow-hidden rounded-3xl ${compact ? 'bg-[#070a17]/95 inset-x-3 bottom-3 max-h-[58vh]' : `bg-[#070a17]/88 ${touch ? 'bottom-[13.5rem]' : 'bottom-28'} right-6 top-[19.5rem] w-[340px] lg:right-10`}`}
       initial={{ opacity: 0, x: reducedMotion || compact ? 0 : 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0 }}

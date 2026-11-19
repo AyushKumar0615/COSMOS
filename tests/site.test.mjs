@@ -605,6 +605,9 @@ test('extras: rover positions and Earth orbiters are sourced and plausible', () 
       const altitude = Math.hypot(...wc.orbiterPosition(el, jd)) - earthKm
       assert.ok(altitude > 250 && altitude < 700, `${el.id} altitude ${altitude}`)
     }
+    // Its region is its own vicinity, never Earth's neighbourhood.
+    const craft = wc.getWorld().byId[el.id]
+    if (craft) assert.ok(craft.influenceKm <= craft.stopKm * 2 && craft.influenceKm < wc.getWorld().byId.earth.stopKm, `${el.id} region`)
     // Shown only while the TLE is fresh.
     assert.ok(wc.orbitersFor(epoch + 0.5).includes(el))
     assert.ok(!wc.orbitersFor(epoch + wc.ORBITER_DAYS + 0.01).includes(el))

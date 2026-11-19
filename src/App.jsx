@@ -924,7 +924,7 @@ export default function App() {
           </AnimatePresence>
 
           <AnimatePresence>
-            {toast && <Toast key={toast} message={toast} reducedMotion={reducedMotion} />}
+            {toast && <Toast key={toast} message={toast} reducedMotion={reducedMotion} top={scene === 'open' && bottomSheets} />}
           </AnimatePresence>
 
           {!webglSupported && (
