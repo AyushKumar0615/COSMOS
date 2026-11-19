@@ -213,7 +213,22 @@ Branch `main`; local commits allowed, nothing pushed or deployed.
 - Markers no longer show through the translucent HUD panels.
 - Commits on `open-universe`: `0546ea0`, `dc69234`, `130c2a2`, `3efb9c5`. Unit 36/36; full browser suite 38/38 on the final build.
 
-Next task: the first open item in `COSMOS_OVERNIGHT_TODO.md`.
+## Cycle L — comets up close, UI review (2026-11-19)
+
+- Coma glow (`CometTails.jsx`, `comaMaterial` in `lib/cometTail.js`): true
+  angular size from a modelled radius, greenish (C2 emission), fades from inside.
+- Nucleus close-ups (`DetailBodies.jsx` `SmallBody`): comets and asteroids as a
+  smooth irregular rock (`ROCK`, shared with the solar scene, now with merged
+  vertices); dark nucleus with a faint inner coma.
+- Station-keeping: after autopilot arrival the ship rides along with the body
+  across the 2 s position refreshes (`L.anchor` in `OpenUniverse.jsx`); Encke
+  used to drift out of view at its 10 km stop distance.
+- Screenshot review of all scenes: fixed the phone Discover button overlapping
+  the toolbar; stronger marker label shadows.
+- Commits: `1947f7f`, `ade3391`. Unit 36/36; lint 0 errors; full browser suite 38/38 on the final build; 60 fps in every scene; heap 14.2 → 14.1 MB; first contentful paint 164 ms.
+
+Next task: none independently actionable; see "Needs a decision or data from
+the user" in `COSMOS_OVERNIGHT_TODO.md`.
 
 ## Resume
 

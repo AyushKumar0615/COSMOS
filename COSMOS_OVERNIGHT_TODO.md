@@ -17,4 +17,20 @@ Done items move to COSMOS_OVERNIGHT_PROGRESS.md. Highest priority first.
 13. [x] Stars with no measured radius: radius inferred from measured magnitude, distance and temperature (labelled Inferred).
 14. [x] Markers hidden beneath HUD panels (`writeMarkers`, `.glass` rects); browser suite 38/38, checked at Saturn.
 15. [ ] Constellation lines (needs Hipparcos positions for the figure stars via `npm run catalogue`; not in the data).
-16. [ ] Comet coma glow in the open universe (tails only today; the beacon marks the head).
+16. [x] Comet coma (true angular size, fades from inside), dark irregular nucleus with inner coma for close-ups, station-keeping after arrival.
+17. [x] Phone: Discover button no longer overlaps the toolbar; marker labels readable over bright planets.
+
+## Needs a decision or data from the user
+
+- **Atlas mirror (item 11):** the Universe atlas places galactic l = 90° on +Z, a mirror image
+  of the sky. Proposed change: negate Z in `truePosition` (and anything that reads it). This
+  changes an existing view, so it waits for approval.
+- **Earth-orbit satellites in the open universe (item 9):** needs real orbital elements
+  (e.g. CelesTrak TLEs) added to the data pipeline. Not fabricated.
+- **Mars rovers (item 10):** needs mission-published coordinates. Not fabricated.
+- **Constellation lines (item 15):** needs Hipparcos positions for the figure stars added via
+  `npm run catalogue`. Not fabricated.
+- **Safari and real devices (item 12):** needs testing on the user's hardware.
+- **Merge / push / deploy:** branch `open-universe` is local and unmerged; nothing is pushed.
+
+Nothing else on this list can be done without one of the above.
