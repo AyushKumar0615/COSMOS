@@ -34,14 +34,41 @@ const qShip = new THREE.Quaternion()
 const qLean = new THREE.Quaternion()
 const euler = new THREE.Euler()
 // Debug-only inspection (?debug): turn the figure and bring it closer.
-const inspect = { yaw: 0, distance: 0, lift: 0 }
+const inspect = { yaw: 0, distance: 0, lift: 0, refreshes: 0 }
 
 // Live reflection and shadow budget per device tier.
+// The reflection is refreshed one cube face at a time: `faces` per frame
+// while the view is changing (a full refresh every 6 / faces frames), and a
+// full refresh every `idle` frames when nothing moves. Shadows are re-rendered
+// every `shadowEvery` frames.
 const TIER = {
-  high: { cube: 256, every: 4, shadow: 1024 },
-  medium: { cube: 128, every: 8, shadow: 512 },
-  low: { cube: 64, every: 20, shadow: 0 },
+  high: { cube: 256, faces: 3, idle: 30, shadow: 1024, shadowEvery: 1 },
+  medium: { cube: 128, faces: 1, idle: 60, shadow: 512, shadowEvery: 2 },
+  low: { cube: 64, faces: 0.5, idle: 90, shadow: 0, shadowEvery: 0 },
 }
+
+/**
+ * Glass and gold film reflect only what the live environment holds. Direct
+ * (punctual) specular is dropped: the scene's point and key lights are tiny
+ * stand-ins, and as sharp dots on a mirror they read as two glowing eyes.
+ */
+function environmentOnly(material) {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <lights_fragment_end>',
+      `#include <lights_fragment_end>
+      reflectedLight.directSpecular = vec3(0.0);
+      #ifdef USE_CLEARCOAT
+        clearcoatSpecularDirect = vec3(0.0);
+      #endif`,
+    )
+  }
+  material.customProgramCacheKey = () => 'environment-only'
+  return material
+}
+
+const [PX, NX, PY, NY, PZ, NZ] = [0, 1, 2, 3, 4, 5]
+const FACES = [PX, NX, PY, NY, PZ, NZ]
 
 // --- Geometry helpers ---------------------------------------------------------------------
 
@@ -85,6 +112,8 @@ function limb(r0, r1, y0, y1, { ridges = 0, at = 'top', depth = 0.012, span = 0.
  * angular frequencies keep the lathe seam closed.
  */
 function wrinkle(geometry, amp = 0.0032) {
+  geometry.computeBoundingBox()
+  const { min, max } = geometry.boundingBox
   const p = geometry.attributes.position
   for (let i = 0; i < p.count; i += 1) {
     const x = p.getX(i)
@@ -95,7 +124,10 @@ function wrinkle(geometry, amp = 0.0032) {
     const a = Math.atan2(z, x)
     const crease = Math.sin(y * 62 + Math.sin(a * 3) * 1.8) * (0.5 + 0.5 * Math.sin(a * 2 + y * 11))
     const bag = Math.sin(a * 5 + y * 21) * 0.45 + Math.sin(a * 3 - y * 37) * 0.3
-    const d = amp * (crease * 0.75 + bag * 0.5)
+    // Fabric bunches where the limb bends: deeper creases near both ends.
+    const end = Math.min(y - min.y, max.y - y) / (max.y - min.y)
+    const bunch = 1 + 1.1 * Math.exp(-end * 9)
+    const d = amp * (crease * 0.75 * bunch + bag * 0.5)
     p.setXYZ(i, x + (x / r) * d, y, z + (z / r) * d)
   }
   geometry.computeVertexNormals()
@@ -114,6 +146,19 @@ function bearing(r, tube) {
   const merged = mergeGeometries(parts)
   parts.forEach((g) => g.dispose())
   return merged
+}
+
+/**
+ * A narrow stitched strip down a tapering limb, on its -x side (turn it to
+ * place it). Its u runs along the limb so the stitch texture follows it.
+ */
+function inseam(r0, r1, y0, y1) {
+  const geometry = new THREE.CylinderGeometry(r1 * 1.035, r0 * 1.035, y1 - y0, 2, 24, true, Math.PI * 1.5 - 0.11, 0.22)
+  geometry.translate(0, (y0 + y1) / 2, 0)
+  const uv = geometry.attributes.uv
+  const tiles = (y1 - y0) / 0.04
+  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getY(i) * tiles, uv.getX(i))
+  return geometry
 }
 
 /** Place a part at a point on a curve, its axis (y) along the curve. */
@@ -271,7 +316,10 @@ function buildGeometry() {
     bearing: bearing(0.1, 0.014),
     bearingSmall: bearing(0.078, 0.011),
     // Seam piping: a narrow band just proud of the fabric, stitched both sides.
-    seam: new THREE.CylinderGeometry(1, 1, 0.17, 48, 1, true),
+    seam: uvScale(new THREE.CylinderGeometry(1, 1, 0.17, 64, 1, true), 34, 1),
+    // Inseams: narrow stitched strips running down the limbs.
+    inseamArm: inseam(0.088, 0.096, -0.33, -0.03),
+    inseamThigh: inseam(0.098, 0.112, -0.37, -0.03),
     glove,
     gloveTips,
     gauntlet,
@@ -297,7 +345,8 @@ function buildGeometry() {
     patch: new THREE.CircleGeometry(0.05, 32),
     flag: new THREE.PlaneGeometry(0.095, 0.05),
     tag: new THREE.PlaneGeometry(0.14, 0.035),
-    stripe: new THREE.CylinderGeometry(1, 1, 0.045, 28, 1, true),
+    // Weave at the same scale as the leg it is sewn onto (radius about 0.11).
+    stripe: uvScale(new THREE.CylinderGeometry(1, 1, 0.045, 40, 1, true), (Math.PI * 2 * 0.11) / 0.11, 0.045 / 0.11),
   }
 }
 
@@ -310,11 +359,14 @@ function useSuit() {
     // Live reflections: a small cube camera renders the real scene round the
     // astronaut (Sun, Earth, stars, sky); three.js turns it into blurred
     // mip levels for each roughness when it is marked for update.
-    const reflection = new THREE.WebGLCubeRenderTarget(tier.cube, { type: THREE.HalfFloatType })
+    const reflection = new THREE.WebGLCubeRenderTarget(tier.cube, { type: THREE.HalfFloatType, generateMipmaps: false })
     const cubeCamera = new THREE.CubeCamera(0.05, 64000, reflection)
+    // Faces are rendered one at a time below, so lay out the six face cameras
+    // here (CubeCamera.update would otherwise do it on first use).
+    cubeCamera.coordinateSystem = gl.coordinateSystem
+    cubeCamera.updateCoordinateSystem()
     const envMap = reflection.texture
     const stitch = stitchTexture()
-    stitch.repeat.set(26, 1)
     const flag = flagTexture()
     const patch = missionPatchTexture()
     const tag = nameTagTexture()
@@ -337,7 +389,9 @@ function useSuit() {
       joint: fabric('#e4e3dc', 0.35),
       // Gloves and boots see the most handling: a touch greyer.
       worn: fabric('#dcd9d1', 0.35),
-      stitch: new THREE.MeshStandardMaterial({ map: stitch, roughness: 0.9, normalMap: maps.normal, envMap, envMapIntensity: 0.3 }),
+      // Alternate panels in a very slightly warmer white, as separate bolts of cloth are.
+      panelWarm: fabric('#f2efe6'),
+      stitch: new THREE.MeshStandardMaterial({ map: stitch.map, normalMap: stitch.normal, roughness: 0.82, envMap, envMapIntensity: 0.3 }),
       hose: fabric('#c9ccd0', 0.4),
       stripe: fabric('#a3212c', 0.2),
       shell: new THREE.MeshPhysicalMaterial({ color: '#f1f0ec', roughness: 0.38, clearcoat: 0.5, clearcoatRoughness: 0.25, envMap, envMapIntensity: 0.55 }),
@@ -349,7 +403,7 @@ function useSuit() {
       dark: new THREE.MeshStandardMaterial({ color: '#25292f', roughness: 0.5, metalness: 0.4, envMap, envMapIntensity: 0.5 }),
       // Gold film on polycarbonate: a mirror tinted gold, with a whisper of
       // emission so it never reads as a hole in dark space.
-      visor: new THREE.MeshPhysicalMaterial({
+      visor: environmentOnly(new THREE.MeshPhysicalMaterial({
         color: '#e0ad4c',
         metalness: 1,
         roughness: 0.07,
@@ -362,11 +416,11 @@ function useSuit() {
         iridescenceThicknessRange: [180, 420],
         emissive: '#2a1a05',
         emissiveIntensity: 0.35,
-      }),
+      })),
       // The clear protective visor in front of the gold one: a reflection
       // over depth, nearly invisible face on.
-      clearVisor: new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.02, metalness: 0, transparent: true, opacity: 0.08, clearcoat: 1, envMap, envMapIntensity: 2.2, depthWrite: false }),
-      bubble: new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.03, metalness: 0, transparent: true, opacity: 0.16, envMap, envMapIntensity: 1.4, depthWrite: false }),
+      clearVisor: environmentOnly(new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.02, metalness: 0, transparent: true, opacity: 0.08, clearcoat: 1, envMap, envMapIntensity: 2.2, depthWrite: false })),
+      bubble: environmentOnly(new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.03, metalness: 0, transparent: true, opacity: 0.16, envMap, envMapIntensity: 1.4, depthWrite: false })),
       lamp: new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#eaf4ff', emissiveIntensity: 1.1 }),
       led: new THREE.MeshStandardMaterial({ color: '#2ef0b0', emissive: '#2ef0b0', emissiveIntensity: 1.6 }),
       screen: new THREE.MeshStandardMaterial({ color: '#0d1a14', emissive: '#4ad6a0', emissiveIntensity: 0.35, roughness: 0.3 }),
@@ -374,7 +428,7 @@ function useSuit() {
       patch: new THREE.MeshStandardMaterial({ map: patch, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }),
       tag: new THREE.MeshStandardMaterial({ map: tag, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }),
     }
-    return { geometry, material, textures: [maps.normal, maps.roughness, maps.albedo, stitch, flag, patch, tag], reflection, cubeCamera, tier }
+    return { geometry, material, textures: [maps.normal, maps.roughness, maps.albedo, stitch.map, stitch.normal, flag, patch, tag], reflection, cubeCamera, tier }
   }, [gl])
   useEffect(
     () => () => {
@@ -413,6 +467,8 @@ function Arm({ side, g, m, armRef, foreRef }) {
       <mesh geometry={g.shoulder} material={m.joint} />
       <group position={[side * 0.02, -0.06, 0]}>
         <mesh geometry={g.upperArm} material={m.fabric} />
+        {/* Inseam on the inner side, facing the body. */}
+        <mesh geometry={g.inseamArm} material={m.stitch} rotation={[0, side === 1 ? 0 : Math.PI, 0]} />
         <Seam g={g} m={m} y={-0.17} r={0.093} />
         {side === 1 ? (
           <mesh geometry={g.flag} material={m.flag} position={[0.098, -0.12, 0]} rotation={[0, Math.PI / 2, 0]} />
@@ -421,7 +477,7 @@ function Arm({ side, g, m, armRef, foreRef }) {
         )}
         <group position={[0, -0.38, 0]} ref={foreRef}>
           <mesh geometry={g.elbow} material={m.joint} />
-          <mesh geometry={g.forearm} material={m.fabric} />
+          <mesh geometry={g.forearm} material={m.panelWarm} />
           <Seam g={g} m={m} y={-0.22} r={0.08} />
           <mesh geometry={g.bearingSmall} material={m.metal} position={[0, -0.34, 0]} rotation={[Math.PI / 2, 0, 0]} />
           <mesh geometry={g.bearingSmall} material={side === 1 ? m.red : m.blue} position={[0, -0.355, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1.02, 1.02, 0.5]} />
@@ -443,13 +499,14 @@ function Leg({ side, g, m, legRef, shinRef }) {
     <group position={[side * 0.115, -0.4, 0]} ref={legRef}>
       <mesh geometry={g.bearing} material={m.metal} rotation={[Math.PI / 2, 0, 0]} position={[0, -0.04, 0]} scale={1.18} />
       <mesh geometry={g.thigh} material={m.fabric} position={[0, -0.04, 0]} />
+      <mesh geometry={g.inseamThigh} material={m.stitch} position={[0, -0.04, 0]} rotation={[0, side === 1 ? 0 : Math.PI, 0]} />
       {/* Commander's red stripes. */}
       <mesh geometry={g.stripe} material={m.stripe} position={[0, -0.2, 0]} scale={[0.109, 1, 0.109]} />
       <mesh geometry={g.stripe} material={m.stripe} position={[0, -0.3, 0]} scale={[0.106, 1, 0.106]} />
       <Seam g={g} m={m} y={-0.11} r={0.111} />
       <group position={[0, -0.45, 0]} ref={shinRef}>
         <mesh geometry={g.knee} material={m.joint} />
-        <mesh geometry={g.shin} material={m.fabric} />
+        <mesh geometry={g.shin} material={m.panelWarm} />
         <Seam g={g} m={m} y={-0.24} r={0.087} />
         <mesh geometry={g.bearingSmall} material={m.metal} position={[0, -0.36, 0]} rotation={[Math.PI / 2, 0, 0]} scale={1.08} />
         <group position={[0, -0.4, 0]}>
@@ -548,7 +605,7 @@ export default function Astronaut({ reducedMotion }) {
       window.__cosmosAstronautInspect = inspect
     }
   }, [])
-  const state = useRef({ mix: 0, lean: 0, bank: 0, time: 0, frame: 0, programs: -1, compiling: null, lastQ: new THREE.Quaternion(), turn: new THREE.Vector3() })
+  const state = useRef({ mix: 0, lean: 0, bank: 0, time: 0, frame: 0, programs: -1, compiling: null, skip: [], face: 0, budget: 0, still: 0, lastQ: new THREE.Quaternion(), turn: new THREE.Vector3() })
 
   // Self-shadowing from the scene's key light (the brightest star). Only the
   // astronaut casts and receives, in a frustum just big enough for it, so the
@@ -571,6 +628,10 @@ export default function Astronaut({ reducedMotion }) {
     cam.updateProjectionMatrix()
     light.shadow.bias = -0.0002
     light.shadow.normalBias = 0.002
+    // Rendered on demand (see the frame loop): otherwise every reflection
+    // face would re-render it too, with the figure hidden.
+    light.shadow.autoUpdate = false
+    light.shadow.needsUpdate = true
     figure.traverse((o) => {
       if (!o.isMesh) return
       // Glass casts no shadow; everything else shades itself.
@@ -582,6 +643,7 @@ export default function Astronaut({ reducedMotion }) {
     return () => {
       keyLight.current = null
       light.castShadow = false
+      light.shadow.autoUpdate = true
       light.shadow.map?.dispose()
       light.shadow.map = null
       gl.shadowMap.enabled = previous.enabled
@@ -632,15 +694,20 @@ export default function Astronaut({ reducedMotion }) {
       light.target.updateMatrixWorld()
     }
 
-    // Refresh the reflection a few times a second, without the figure in it.
-    // Drawing into the cube target needs its own shader variants (linear
-    // output, no tone mapping), so when the scene gains new programs they
-    // are first compiled in the background and the refresh waits for them,
-    // instead of compiling in one blocking burst mid-flight.
+    // Refresh the reflection, one cube face at a time, without the figure in
+    // it. Drawing into the cube target needs its own shader variants (linear
+    // output, no tone mapping), so when the scene gains new programs they are
+    // compiled in the background first rather than in one blocking burst.
     s.frame += 1
     const programs = gl.info.programs?.length ?? 0
     if (programs !== s.programs && !s.compiling) {
       s.programs = programs
+      // Decorative layers that add nothing to a blurred reflection: field
+      // stars (the sky shader already has the stars), belts, lines.
+      s.skip = []
+      scene.traverse((o) => {
+        if ((o.isPoints && (o.renderOrder === -20 || o.renderOrder === -15)) || o.isLine) s.skip.push(o)
+      })
       const previous = gl.getRenderTarget()
       gl.setRenderTarget(reflection)
       s.compiling = gl.compileAsync(scene, cubeCamera.children[0]).finally(() => {
@@ -648,14 +715,40 @@ export default function Astronaut({ reducedMotion }) {
       })
       gl.setRenderTarget(previous)
     }
-    if (root_.visible && !s.compiling && (s.frame % tier.every === 0 || s.frame < 3)) {
-      root_.visible = false
-      cubeCamera.position.copy(root_.position)
-      cubeCamera.updateMatrixWorld()
-      cubeCamera.update(gl, scene)
-      reflection.texture.needsPMREMUpdate = true
-      root_.visible = true
+    // Moving (or turning, which moves the capture point) means a fast cycle.
+    const moving = ship.speed > 0 || Math.abs(s.turn.x) + Math.abs(s.turn.y) > 0.02 || inspect.distance > 0
+    if (moving) s.still = 0
+    else s.still += 1
+    if (root_.visible && !s.compiling) {
+      s.budget += s.frame < 3 ? 6 : moving ? tier.faces : s.still % tier.idle === 0 ? 6 : 0
+      if (s.budget >= 1) {
+        const hidden = s.skip.filter((o) => o.visible)
+        hidden.forEach((o) => (o.visible = false))
+        root_.visible = false
+        const current = { target: gl.getRenderTarget(), face: gl.getActiveCubeFace(), mip: gl.getActiveMipmapLevel() }
+        if (s.face === 0) {
+          cubeCamera.position.copy(root_.position)
+          cubeCamera.updateMatrixWorld()
+        }
+        while (s.budget >= 1) {
+          s.budget -= 1
+          gl.setRenderTarget(reflection, FACES[s.face])
+          gl.render(scene, cubeCamera.children[s.face])
+          s.face = (s.face + 1) % 6
+          // A full cycle: re-filter the blurred levels once.
+          if (s.face === 0) {
+            reflection.texture.needsPMREMUpdate = true
+            inspect.refreshes += 1
+            s.budget = Math.min(s.budget, 0)
+            break
+          }
+        }
+        gl.setRenderTarget(current.target, current.face, current.mip)
+        root_.visible = true
+        hidden.forEach((o) => (o.visible = true))
+      }
     }
+    if (light && (tier.shadowEvery === 1 || s.frame % tier.shadowEvery === 0)) light.shadow.needsUpdate = true
 
     // Body: faces away from the camera; leans into thrust, banks into turns.
     const b = body.current

@@ -1225,6 +1225,51 @@ test('open universe: discovery ahead, distances, autopilot, map and bookmarks', 
   await page.close()
 })
 
+test('open universe: frame times hold on desktop, tablet and phone tiers', { timeout: 300000 }, async () => {
+  // Every animation frame's interval for 3 s, idle and then during an
+  // autopilot trip (bodies mount and compile mid-flight). A hitch shows as a
+  // long worst frame even when the average is fine.
+  const sample = `new Promise((resolve) => { const t = []; let last = performance.now(); const start = last
+    const f = (now) => { t.push(now - last); last = now; now - start < 3000 ? requestAnimationFrame(f) : resolve(t) }
+    requestAnimationFrame(f) })`
+  const summarise = (t) => {
+    const sorted = [...t].sort((a, b) => a - b)
+    return {
+      fps: Math.round(t.length / (t.reduce((a, b) => a + b, 0) / 1000)),
+      p95Ms: +sorted[Math.floor(sorted.length * 0.95)].toFixed(1),
+      worstMs: +sorted[sorted.length - 1].toFixed(1),
+    }
+  }
+  metrics.openUniverseFrames = {}
+  for (const [name, viewport, tier] of [
+    ['desktop', VIEWPORTS.desktop, 'high'],
+    ['tablet', VIEWPORTS.tablet, 'medium'],
+    ['phone', VIEWPORTS.phone, 'medium'],
+    ['phone-low', VIEWPORTS.phone, 'low'],
+  ]) {
+    const page = await open(viewport, `&quality=${tier}`)
+    await enterOpen(page, viewport)
+    await sleep(1500)
+    const idle = summarise(await page.evaluate(sample))
+    const before = await page.evaluate(`window.__cosmosAstronautInspect.refreshes`)
+    await page.evaluate(`__cosmosOpen.set({ targetId: 'jupiter', autopilot: true })`)
+    await sleep(300)
+    const travel = summarise(await page.evaluate(sample))
+    const refreshes = (await page.evaluate(`window.__cosmosAstronautInspect.refreshes`)) - before
+    metrics.openUniverseFrames[name] = { tier, idle, travel, reflectionRefreshesWhileMoving: refreshes }
+    for (const [phase, r] of [['idle', idle], ['travel', travel]]) {
+      assert.ok(r.fps >= 55, `${name} ${phase}: ${r.fps} fps`)
+      assert.ok(r.p95Ms <= 20, `${name} ${phase}: p95 ${r.p95Ms} ms`)
+      // One dropped frame (33 ms) can happen; a compile stall cannot.
+      assert.ok(r.worstMs <= 50, `${name} ${phase}: worst frame ${r.worstMs} ms`)
+    }
+    // The visor's reflection keeps up while moving (low tier refreshes least).
+    assert.ok(refreshes >= (tier === 'low' ? 5 : 15), `${name}: ${refreshes} reflection refreshes in 3.3 s of travel`)
+    assert.deepEqual(page.problems, [])
+    await page.close()
+  }
+})
+
 test('open universe: floating labels stay inside the screen and off the panels', { timeout: 120000 }, async () => {
   // Sweep the view round and sample every frame: no shown marker's box or
   // label may leave the viewport or sit under a HUD panel.

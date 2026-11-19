@@ -115,35 +115,76 @@ export function fabricMaps(size = 512) {
 }
 
 /**
- * Seam piping with two rows of lock stitches, for a band whose u runs round
- * the limb: thread-coloured dashes on fabric, with the needle holes darker.
+ * Seam piping with two rows of fine lock stitches. u runs along the seam
+ * (one tile = 16 stitches), v across it. Returns colour and normal maps:
+ * each stitch is a raised thread sinking into its needle holes, and the
+ * fabric either side puckers slightly towards the seam.
  */
 export function stitchTexture() {
-  const w = 64
-  const h = 32
-  const c = canvas(w, h)
-  const g = c.getContext('2d')
-  const fabric = g.createLinearGradient(0, 0, 0, h)
-  fabric.addColorStop(0, '#d9d7cf')
-  fabric.addColorStop(0.5, '#ecebe5')
-  fabric.addColorStop(1, '#d9d7cf')
-  g.fillStyle = fabric
-  g.fillRect(0, 0, w, h)
-  for (const y of [7, 25]) {
-    for (let x = 0; x < w; x += 16) {
-      g.fillStyle = '#b9b6ac'
-      g.fillRect(x + 1, y - 1, 2, 2)
-      g.fillStyle = '#f7f6f1'
-      g.fillRect(x + 3, y - 1, 10, 2)
-      g.fillStyle = 'rgba(80,78,70,0.35)'
-      g.fillRect(x + 3, y + 1, 10, 1)
+  const w = 256
+  const h = 64
+  const height = new Float32Array(w * h)
+  const colour = new Uint8ClampedArray(w * h * 4)
+  const pitch = w / 16
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const v = y / h
+      // A folded-over band: highest at the fold line, sinking to each edge.
+      let hgt = 0.6 * Math.exp(-((v - 0.5) ** 2) / 0.05) + 0.25 * Math.sin(x * 0.9) * 0.05
+      let shade = 0.9 + 0.06 * Math.exp(-((v - 0.5) ** 2) / 0.04)
+      for (const row of [0.22, 0.78]) {
+        const across = Math.abs(v - row) * h
+        const along = (x % pitch) / pitch
+        if (across < 1.6) {
+          if (along > 0.12 && along < 0.88) {
+            // The thread: a rounded ridge, slightly glossy and brighter.
+            const t = Math.sin(((along - 0.12) / 0.76) * Math.PI)
+            hgt += 0.9 * t * (1 - across / 1.6)
+            shade = Math.max(shade, 1.0)
+          } else {
+            // The needle hole.
+            hgt -= 0.6
+            shade = 0.7
+          }
+        } else if (across < 4) {
+          // Fabric pulled down towards the stitch line.
+          hgt -= 0.2 * (1 - (across - 1.6) / 2.4)
+        }
+      }
+      height[y * w + x] = hgt
+      const i = (y * w + x) * 4
+      colour[i] = 236 * shade
+      colour[i + 1] = 234 * shade
+      colour[i + 2] = 226 * shade
+      colour[i + 3] = 255
     }
   }
-  const t = new THREE.CanvasTexture(c)
-  t.wrapS = THREE.RepeatWrapping
-  t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 8
-  return t
+  const c = canvas(w, h)
+  c.getContext('2d').putImageData(new ImageData(colour, w, h), 0, 0)
+  const nc = canvas(w, h)
+  const n = nc.getContext('2d').createImageData(w, h)
+  const at = (x, y) => height[Math.min(h - 1, Math.max(0, y)) * w + ((x + w) % w)]
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * 1.2
+      const dy = (at(x, y + 1) - at(x, y - 1)) * 1.2
+      const len = Math.hypot(dx, dy, 1)
+      const i = (y * w + x) * 4
+      n.data[i] = ((-dx / len) * 0.5 + 0.5) * 255
+      n.data[i + 1] = ((dy / len) * 0.5 + 0.5) * 255
+      n.data[i + 2] = (1 / len) * 255
+      n.data[i + 3] = 255
+    }
+  }
+  nc.getContext('2d').putImageData(n, 0, 0)
+  const map = new THREE.CanvasTexture(c)
+  map.colorSpace = THREE.SRGBColorSpace
+  const normal = new THREE.CanvasTexture(nc)
+  for (const t of [map, normal]) {
+    t.wrapS = THREE.RepeatWrapping
+    t.anisotropy = 8
+  }
+  return { map, normal }
 }
 
 const textureFrom = (c) => {
