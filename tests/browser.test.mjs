@@ -1225,6 +1225,45 @@ test('open universe: discovery ahead, distances, autopilot, map and bookmarks', 
   await page.close()
 })
 
+test('open universe: floating labels stay inside the screen and off the panels', { timeout: 120000 }, async () => {
+  // Sweep the view round and sample every frame: no shown marker's box or
+  // label may leave the viewport or sit under a HUD panel.
+  const sample = `new Promise((resolve) => { const t0 = performance.now(); const bad = new Set(); let shown = 0
+    const panels = [...document.querySelectorAll('.glass')].map((p) => p.getBoundingClientRect()).filter((r) => r.width && r.height)
+    const tick = () => {
+      for (const b of document.querySelectorAll('[aria-label="Objects in view"] > button')) {
+        if (b.style.opacity === '0') continue
+        shown++
+        for (const part of b.children) {
+          const r = part.getBoundingClientRect()
+          const out = r.left < -0.5 || r.top < -0.5 || r.right > innerWidth + 0.5 || r.bottom > innerHeight + 0.5
+          const under = panels.some((p) => r.right > p.left + 1 && r.left < p.right - 1 && r.bottom > p.top + 1 && r.top < p.bottom - 1)
+          if (out || under) bad.add(b.dataset.id + (out ? ' off-screen' : ' under a panel'))
+        }
+      }
+      performance.now() - t0 < 1000 ? requestAnimationFrame(tick) : resolve({ shown, bad: [...bad] })
+    }
+    requestAnimationFrame(tick) })`
+  const yaw = `(() => { const q = __cosmosOpen.ship.quat; const h = Math.PI / 12; const s = Math.sin(h), c = Math.cos(h); const [x, y, z, w] = q
+    q[0] = x * c - z * s; q[1] = y * c + w * s; q[2] = z * c + x * s; q[3] = w * c - y * s })()`
+  for (const name of ['phone', 'tablet']) {
+    const viewport = VIEWPORTS[name]
+    const page = await open(viewport)
+    await enterOpen(page, viewport)
+    let shown = 0
+    for (let step = 0; step < 12; step += 1) {
+      await page.evaluate(yaw)
+      await sleep(250)
+      const result = await page.evaluate(sample)
+      shown += result.shown
+      assert.deepEqual(result.bad, [], `${name}, ${step * 30}°`)
+    }
+    assert.ok(shown > 0, `${name}: some markers were shown`)
+    assert.deepEqual(page.problems, [])
+    await page.close()
+  }
+})
+
 test('open universe: touch, phone and landscape layouts', { timeout: 120000 }, async () => {
   for (const name of ['phone', 'landscape', 'tablet']) {
     const viewport = VIEWPORTS[name]

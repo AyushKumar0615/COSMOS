@@ -247,7 +247,7 @@ export default function OpenUniverseHud({ onExit, onExplore, showToast, reducedM
             style={{ pointerEvents: 'none' }}
           >
             <span className="absolute -left-2.5 -top-2.5 h-5 w-5 rounded-[3px] border border-white/45 group-data-[target=true]:border-cyan group-data-[target=true]:shadow-[0_0_10px_rgba(34,211,238,0.6)]" />
-            <span className="absolute left-4 -top-2.5 whitespace-nowrap text-left">
+            <span className="absolute left-4 -top-2.5 whitespace-nowrap text-left group-data-[side=left]:left-auto group-data-[side=left]:right-4 group-data-[side=left]:text-right">
               <span data-name className="block text-[0.75rem] font-light leading-tight text-ink [text-shadow:0_0_5px_#000,0_1px_3px_#000]" />
               <span data-distance className="readout block leading-tight text-ink-dim [text-shadow:0_0_5px_#000,0_1px_3px_#000]" />
             </span>

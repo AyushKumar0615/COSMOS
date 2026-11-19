@@ -165,6 +165,7 @@ export default function OpenUniverse({ reducedMotion }) {
     warnedLight: false,
     panels: [],
     panelsAt: 0,
+    widths: new Map(),
     anchor: null,
   })
 
@@ -777,6 +778,12 @@ function occluded(world, view, obj) {
 const projected = new THREE.Vector3()
 const placed = []
 
+// Marker geometry, matching the HUD's marker markup: a 20 px box centred on the
+// object, the label 16 px to its side, two lines reaching 24 px below.
+const EDGE = 12
+const LABEL_GAP = 16
+const LABEL_BELOW = 24
+
 function writeMarkers(L, world, view, camera, size) {
   const root = markers.root
   if (!root) return
@@ -802,26 +809,40 @@ function writeMarkers(L, world, view, camera, size) {
     const i = obj.index * 3
     projected.set(view.rp[i], view.rp[i + 1], view.rp[i + 2]).project(camera)
     const behind = projected.z > 1
-    const offscreen = behind || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1
+    const x = ((projected.x + 1) / 2) * size.width
+    const y = ((1 - projected.y) / 2) * size.height
+    // The box marks the object itself, so it is never shifted: one that would
+    // be cut by the edge (or whose label would run off the bottom) counts as
+    // off-screen, and a target gets the edge arrow instead.
+    const offscreen = behind || x < EDGE || x > size.width - EDGE || y < EDGE || y > size.height - EDGE - LABEL_BELOW
     if (offscreen) {
       if (id === L.markerTarget) targetOff = { x: behind ? -projected.x : projected.x, y: behind ? -projected.y : projected.y }
       continue
     }
-    const x = ((projected.x + 1) / 2) * size.width
-    const y = ((1 - projected.y) / 2) * size.height
-    if (L.panels.some((r) => x > r[0] && x < r[2] && y > r[1] && y < r[3])) continue
+    // A label that would run off the right edge sits to the left of its box.
+    const label = `${obj.name}|${L.labels.get(id) ?? ''}`
+    // Last measured width for this object (the distance text changes often);
+    // before the first measurement, a generous estimate from the text.
+    const w = L.widths.get(id) ?? Math.max(obj.name.length * 7, (L.labels.get(id) ?? '').length * 8.5)
+    const left = x + LABEL_GAP + w > size.width - 4
+    // The whole marker, box and label, must clear the HUD panels.
+    const x0 = left ? x - LABEL_GAP - w : x - 10
+    const x1 = left ? x + 10 : x + LABEL_GAP + w
+    if (L.panels.some((r) => x1 > r[0] && x0 < r[2] && y + LABEL_BELOW > r[1] && y - 10 < r[3])) continue
     // Labels do not stack: the target first, then the rest in priority order.
     if (id !== L.markerTarget && placed.some((p) => Math.abs(p[0] - x) < 110 && Math.abs(p[1] - y) < 30)) continue
     placed.push([x, y])
     const el = pool[used]
     used += 1
-    const label = `${obj.name}|${L.labels.get(id) ?? ''}`
     if (el.dataset.label !== label) {
       el.dataset.label = label
       el.dataset.id = id
       el.querySelector('[data-name]').textContent = obj.name
       el.querySelector('[data-distance]').textContent = L.labels.get(id) ?? ''
+      // Layout is read only when the text changes.
+      L.widths.set(id, el.lastElementChild.offsetWidth)
     }
+    el.dataset.side = left ? 'left' : 'right'
     el.dataset.target = String(id === L.markerTarget)
     el.dataset.type = obj.type
     el.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`
