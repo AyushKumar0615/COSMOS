@@ -247,8 +247,8 @@ export default function OpenUniverseHud({ onExit, onExplore, showToast, reducedM
           >
             <span className="absolute -left-2.5 -top-2.5 h-5 w-5 rounded-[3px] border border-white/45 group-data-[target=true]:border-cyan group-data-[target=true]:shadow-[0_0_10px_rgba(34,211,238,0.6)]" />
             <span className="absolute left-4 -top-2.5 whitespace-nowrap text-left">
-              <span data-name className="block text-[0.75rem] font-light leading-tight text-ink [text-shadow:0_1px_3px_#000]" />
-              <span data-distance className="readout block leading-tight opacity-80 [text-shadow:0_1px_3px_#000]" />
+              <span data-name className="block text-[0.75rem] font-light leading-tight text-ink [text-shadow:0_0_5px_#000,0_1px_3px_#000]" />
+              <span data-distance className="readout block leading-tight text-ink-dim [text-shadow:0_0_5px_#000,0_1px_3px_#000]" />
             </span>
           </button>
         ))}
@@ -359,7 +359,7 @@ export default function OpenUniverseHud({ onExit, onExplore, showToast, reducedM
         )}
       </AnimatePresence>
       {!panel && !inspectId && (
-        <button type="button" onClick={() => setPanel('ahead')} className={`glass pointer-events-auto absolute flex items-center gap-2 rounded-full px-4 py-2 text-ink-dim hover:text-ink ${short ? 'right-3 top-20' : compact ? 'right-3 top-[9.5rem]' : touch ? 'right-6 top-[32rem]' : 'bottom-10 right-6 lg:right-10'}`}>
+        <button type="button" onClick={() => setPanel('ahead')} className={`glass pointer-events-auto absolute flex items-center gap-2 rounded-full px-4 py-2 text-ink-dim hover:text-ink ${short ? 'right-3 top-20' : compact ? 'right-3 top-[11rem]' : touch ? 'right-6 top-[32rem]' : 'bottom-10 right-6 lg:right-10'}`}>
           <span className="h-1.5 w-1.5 rounded-full bg-cyan" aria-hidden="true" />
           <span className="eyebrow">Discover</span>
         </button>
