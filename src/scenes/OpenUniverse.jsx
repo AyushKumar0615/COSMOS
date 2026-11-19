@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import Astronaut from '../components/3d/open/Astronaut.jsx'
 import Belts from '../components/3d/open/Belts.jsx'
 import CometTails from '../components/3d/open/CometTails.jsx'
+import Constellations from '../components/3d/open/Constellations.jsx'
 import DetailBodies, { beaconColor } from '../components/3d/open/DetailBodies.jsx'
 import PointLayer from '../components/3d/open/PointLayer.jsx'
 import Sky from '../components/3d/open/Sky.jsx'
@@ -449,6 +450,7 @@ export default function OpenUniverse({ reducedMotion }) {
       <PointLayer capacity={n} layer={beacons} renderOrder={-10} />
       <Belts />
       <CometTails world={world} />
+      <Constellations />
       <SpaceDust reducedMotion={reducedMotion} />
       <primitive object={route} />
       <DetailBodies list={detail} world={world} view={view} reducedMotion={reducedMotion} outside={outside} />

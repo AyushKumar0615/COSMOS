@@ -47,12 +47,13 @@ let settings = {
   labels: true, // floating markers
   route: true, // line to the target
   belts: true, // asteroid and Kuiper belts (modelled)
+  constellations: false, // figure lines, near the Sun only
   mouseSteer: false,
 }
 // Display and volume choices last between visits; sound itself never starts
 // on its own (browsers block autoplay, and it should be the visitor's choice).
 const SAVED_KEY = 'cosmos.open.settings.v1'
-const SAVED = ['volume', 'dust', 'field', 'labels', 'route', 'belts', 'camera', 'response', 'dampers']
+const SAVED = ['volume', 'dust', 'field', 'labels', 'route', 'belts', 'constellations', 'camera', 'response', 'dampers']
 try {
   if (typeof window !== 'undefined') {
     const stored = JSON.parse(window.localStorage.getItem(SAVED_KEY) ?? '{}')

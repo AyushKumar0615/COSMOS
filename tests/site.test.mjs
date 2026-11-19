@@ -10,6 +10,8 @@ import { MOONS, SMALL_BODIES, radiusFromAu } from '../src/data/solarBodies.js'
 import { SOLAR_BODIES, SOLAR_BODIES_BY_ID } from '../src/data/solarNames.js'
 import orbitsData from '../src/data/catalogue/orbits.json' with { type: 'json' }
 import trajectoriesData from '../src/data/catalogue/trajectories.json' with { type: 'json' }
+import skyData from '../src/data/catalogue/constellations.json' with { type: 'json' }
+import extrasData from '../src/data/catalogue/extras.json' with { type: 'json' }
 import { eclipseState, julianDate, moonPosition, planetPosition, solveKepler } from '../src/lib/orbits.js'
 import { EFFECT_DEFAULTS } from '../src/lib/effects.js'
 import { ROCK, comaMaterial, cometActivity } from '../src/lib/cometTail.js'
@@ -389,7 +391,7 @@ test('config: vercel.json serves every public file and sends the security header
 
 const ow = await import('../src/lib/openWorld.js')
 const wc = await import('../src/lib/worldCatalogue.js')
-const { truePosition } = await import('../src/data/catalogue/index.js')
+const { truePosition, mapPosition, galacticToScene } = await import('../src/data/catalogue/index.js')
 
 test('open universe: units and readouts pick the right scale', () => {
   assert.equal(ow.formatKm(384400), '384,400 km')
@@ -408,16 +410,48 @@ test('open universe: units and readouts pick the right scale', () => {
   assert.ok(Math.abs(ow.KM_PER_PC / ow.KM_PER_LY - 3.26156) < 1e-4)
 })
 
+test('atlas: galactic frame is a rotation, not a mirror image', () => {
+  // Images of the galactic unit vectors (towards l = 0, l = 90°, the north pole).
+  const ex = galacticToScene(0, 0, 1)
+  const ey = galacticToScene(90, 0, 1)
+  const ez = galacticToScene(0, 90, 1)
+  const cross = [ex[1] * ey[2] - ex[2] * ey[1], ex[2] * ey[0] - ex[0] * ey[2], ex[0] * ey[1] - ex[1] * ey[0]]
+  cross.forEach((v, i) => assert.ok(Math.abs(v - ez[i]) < 1e-12, `x × y = z (axis ${i})`))
+  // Known directions: the Galactic Centre on +X, l = 90° on -Z, the anticentre side on +Z for l > 180°.
+  const sgr = truePosition(CATALOGUE_BY_ID['sgr-a'])
+  assert.ok(sgr[0] > 0.99 * Math.hypot(...sgr))
+  const l = (e) => (toGalactic(e.ra, e.dec).l + 360) % 360
+  for (const e of CATALOGUE.filter((x) => x.ra != null && x.distanceLy > 0)) {
+    const p = truePosition(e)
+    const sinL = Math.sin((l(e) * Math.PI) / 180)
+    if (Math.abs(sinL) > 0.05 && Math.abs(toGalactic(e.ra, e.dec).b) < 80) assert.equal(Math.sign(p[2]), -Math.sign(sinL), e.id)
+  }
+})
+
+test('atlas: the fix keeps distances, map directions and nearby lists', () => {
+  for (const e of CATALOGUE.filter((x) => x.ra != null && x.distanceLy > 0)) {
+    const t = truePosition(e)
+    const m = mapPosition(e)
+    const d = Math.hypot(...t)
+    assert.ok(Math.abs(d - e.distanceLy) < 1e-9 * Math.max(1, d), `${e.id} distance`)
+    assert.ok(Math.abs(Math.hypot(...m) - mapRadius(e.distanceLy)) < 1e-9, `${e.id} map radius`)
+    // Map and true positions point the same way.
+    const dot = (t[0] * m[0] + t[1] * m[1] + t[2] * m[2]) / (d * Math.hypot(...m))
+    assert.ok(dot > 1 - 1e-12, `${e.id} direction`)
+  }
+  // A reflection preserves separations, so "nearby" is unchanged: Proxima's nearest is Alpha Centauri.
+  const near = nearbyObjects(CATALOGUE_BY_ID.proxima, 3)
+  assert.ok(near.length === 3 && near.every((n, i) => i === 0 || n.awayLy >= near[i - 1].awayLy))
+  assert.match(near[0].id, /alpha-cen|rigil|toliman/i)
+})
+
 test('open universe: a right-handed galactic frame that agrees with the catalogue', () => {
-  // Same positions as the catalogue, with l = 90° on -Z (the catalogue's
-  // truePosition mirrors that axis; distances and the other axes agree).
+  // The same positions as the atlas's truePosition, on every axis.
   for (const id of ['sirius', 'andromeda', 'orion', 'sgr-a', 'proxima']) {
     const e = CATALOGUE_BY_ID[id]
     const mine = ow.raDecToWorld(e.ra, e.dec, e.distanceLy)
     const theirs = truePosition(e)
-    assert.ok(Math.abs(mine[0] - theirs[0]) < 1e-6 * e.distanceLy, id)
-    assert.ok(Math.abs(mine[1] - theirs[1]) < 1e-6 * e.distanceLy, id)
-    assert.ok(Math.abs(mine[2] + theirs[2]) < 1e-6 * e.distanceLy, id)
+    for (let i = 0; i < 3; i += 1) assert.ok(Math.abs(mine[i] - theirs[i]) < 1e-6 * e.distanceLy, `${id} axis ${i}`)
     const { l, b } = ow.galacticAngles(...mine)
     const g = toGalactic(e.ra, e.dec)
     assert.ok(Math.abs(((l - (g.l + 360) % 360 + 540) % 360) - 180) < 1e-4 && Math.abs(b - g.b) < 1e-4, id)
@@ -536,6 +570,39 @@ test('open universe: star sizes inferred from measured brightness are labelled a
   // Order of magnitude: a main-sequence star stays small, a supergiant large.
   assert.ok(byId.sirius.radiusKm / 695700 < 3)
   assert.ok(byId.betelgeuse.radiusKm / 695700 > 100)
+})
+
+test('extras: constellation figures sit on catalogued stars', () => {
+  assert.ok(skyData.source.url && skyData.retrieved)
+  assert.ok(skyData.figures.length >= 88)
+  const ori = skyData.figures.find((f) => f.id === 'Ori')
+  assert.ok(ori, 'Orion present')
+  // A vertex of Orion lies on Betelgeuse's catalogued (SIMBAD) direction.
+  const b = CATALOGUE_BY_ID.betelgeuse
+  const sep = (ra1, d1, ra2, d2) => {
+    const r = Math.PI / 180
+    return Math.acos(Math.min(1, Math.sin(d1 * r) * Math.sin(d2 * r) + Math.cos(d1 * r) * Math.cos(d2 * r) * Math.cos((ra1 - ra2) * r))) / r
+  }
+  const nearest = Math.min(...ori.lines.flat().map(([ra, dec]) => sep(ra, dec, b.ra, b.dec)))
+  assert.ok(nearest < 0.05, `Betelgeuse vertex ${nearest}°`)
+  for (const f of skyData.figures) for (const line of f.lines) for (const [ra, dec] of line) assert.ok(ra >= 0 && ra < 360 && Math.abs(dec) <= 90, f.id)
+})
+
+test('extras: rover positions and Earth orbiters are sourced and plausible', () => {
+  assert.deepEqual(extrasData.rovers.map((r) => r.id).sort(), ['curiosity', 'perseverance'])
+  for (const r of extrasData.rovers) {
+    assert.ok(Math.abs(r.lat) < 90 && r.lonEast >= -180 && r.lonEast <= 360 && r.sol > 0, r.id)
+    assert.match(r.source.url, /^https:\/\/mars\.nasa\.gov\//)
+  }
+  for (const el of extrasData.orbiters) {
+    const p = wc.orbiterPosition(el, el.epochJd)
+    const r = Math.hypot(...p)
+    // On its own ellipse at the epoch.
+    assert.ok(r >= el.aKm * (1 - el.e) - 1e-6 && r <= el.aKm * (1 + el.e) + 1e-6, el.id)
+    // Shown only while fresh.
+    assert.ok(wc.orbitersFor(el.epochJd + 0.5).includes(el))
+    assert.ok(!wc.orbitersFor(el.epochJd + wc.ORBITER_DAYS + 0.01).includes(el))
+  }
 })
 
 test('open universe: real spacecraft speeds come from the Horizons tracks', () => {

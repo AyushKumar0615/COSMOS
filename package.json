@@ -15,7 +15,8 @@
     "orbits": "node scripts/build-orbits.mjs",
     "test": "npm run build && node --test tests/site.test.mjs",
     "test:browser": "npm run build && node --test --test-concurrency=1 tests/browser.test.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "extras": "node scripts/build-extras.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

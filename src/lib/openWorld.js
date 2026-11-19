@@ -5,8 +5,7 @@
  * World frame: galactic, in kilometres, float64. The Sun is at the origin,
  * +X points to the Galactic Centre (l = 0), +Y to the north galactic pole and
  * -Z to l = 90°. That keeps the frame right-handed, as Three.js is, so the
- * sky is not mirrored. (The atlas's `truePosition` puts l = 90° on +Z, a
- * mirror image; its distances are unaffected.)
+ * sky is not mirrored; the atlas's `truePosition` uses the same frame.
  *
  * Pure functions over plain arrays, so they run in tests without a GPU.
  */

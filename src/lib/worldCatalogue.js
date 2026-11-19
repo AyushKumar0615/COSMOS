@@ -5,7 +5,8 @@ import { GALAXIES_BY_ID } from '../data/galaxies.js'
 import { NEBULAE_BY_ID } from '../data/nebulae.js'
 import { BLACK_HOLES } from '../data/blackholes.js'
 import { SATELLITES, isProbe } from '../data/satellites.js'
-import { julianDate, moonPosition, planetPosition, smallBodyPosition } from './orbits.js'
+import { julianDate, moonPosition, planetPosition, positionFromElements, smallBodyPosition } from './orbits.js'
+import EXTRAS from '../data/catalogue/extras.json' with { type: 'json' }
 import { trajectoryPosition, trajectoryRange } from './trajectories.js'
 import { starLook } from './bodyVisuals.js'
 import {
@@ -15,6 +16,7 @@ import {
   SUN_ABS_MAG,
   absoluteMagnitude,
   eclipticToWorld,
+  equatorialToWorld,
   magnitudeFromStar,
   radiusFromMagnitude,
   prng,
@@ -171,6 +173,21 @@ function atAu(au, out) {
   return out
 }
 
+// Two-body elements drift fast in low Earth orbit: checked against Horizons
+// vectors, the error reached hundreds of km (ISS) to about 1,000 km (Hubble)
+// after one day, so nothing is shown beyond that.
+export const ORBITER_DAYS = 1
+
+/** Earth-orbit spacecraft whose elements are within ORBITER_DAYS of `jd`. */
+export const orbitersFor = (jd) => EXTRAS.orbiters.filter((el) => Math.abs(jd - el.epochJd) <= ORBITER_DAYS)
+
+/** Geocentric equatorial position (km) on the osculating orbit at `jd`. */
+export function orbiterPosition(el, jd, out = [0, 0, 0]) {
+  // shortcut: epoch is TDB and jd is UTC (about a minute apart); negligible next to two-body drift.
+  const M = el.meanAnomalyDeg + el.meanMotionDegPerS * (jd - el.epochJd) * 86400
+  return positionFromElements(el.aKm, el.e, el.iDeg, el.nodeDeg, el.periDeg, M, out)
+}
+
 /** Tilt a moon's equatorial orbit by its planet's obliquity, about the ecliptic X axis. */
 function tiltOrbit(v, tiltDeg) {
   // shortcut: JPL gives Laplace/equatorial frames, but the planets' pole
@@ -264,6 +281,33 @@ function solarObjects() {
         comet: body.kind === 'comet' ? el : null,
         update(jd, pos) {
           atAu(smallBodyPosition(el, jd, scratch), pos)
+        },
+      }),
+    )
+  }
+  // Earth-orbit spacecraft, while their Horizons elements are fresh.
+  const earthObj = out.find((o) => o.id === 'earth')
+  for (const el of orbitersFor(julianDate(Date.now()))) {
+    const craft = SATELLITES.find((c) => c.id === el.id)
+    const entry = {
+      id: el.id,
+      name: craft?.name ?? el.id,
+      type: 'spacecraft',
+      class: craft?.category ?? 'Earth orbit',
+      note: craft?.facts?.description ?? null,
+      distanceLy: 0,
+      sources: [el.source],
+    }
+    out.push(
+      base(entry, {
+        radiusKm: 0.05,
+        render: 'probe',
+        parent: 'earth',
+        positionNote: `Approximate: propagated on a fixed (two-body) orbit from JPL Horizons elements of ${EXTRAS.retrieved}. Drag and Earth's oblateness are not modelled; the error grows to hundreds of km within a day, so it is shown only for ${ORBITER_DAYS} day after that.`,
+        update(jd, pos) {
+          orbiterPosition(el, jd, scratch)
+          equatorialToWorld(scratch[0], scratch[1], scratch[2], pos)
+          for (let i = 0; i < 3; i += 1) pos[i] += earthObj.pos[i]
         },
       }),
     )

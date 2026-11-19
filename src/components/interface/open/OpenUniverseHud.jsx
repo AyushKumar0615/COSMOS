@@ -1,3 +1,4 @@
+import extras from '../../../data/catalogue/extras.json' with { type: 'json' }
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import VirtualJoystick from '../VirtualJoystick.jsx'
@@ -708,6 +709,28 @@ function Discovery({ panel, setPanel, t, places, discovery, onPick, targetId, co
   )
 }
 
+/** The rovers' latest published positions (NASA/JPL rover maps), as data, not on the globe. */
+function RoversOnMars() {
+  return (
+    <div className="mt-4">
+      <p className="readout opacity-60">On the surface · as of {extras.retrieved}</p>
+      <ul className="mt-1 space-y-2">
+        {extras.rovers.map((rover) => (
+          <li key={rover.id}>
+            <p className="text-[0.8125rem] text-ink">{rover.name} <span className="text-[0.6875rem] font-light text-muted">· {rover.mission}</span></p>
+            <p className="readout mt-0.5">
+              {Math.abs(rover.lat).toFixed(3)}°{rover.lat >= 0 ? 'N' : 'S'} {rover.lonEast.toFixed(3)}°E · sol {rover.sol}
+              {rover.drivenKm != null ? ` · ${rover.drivenKm} km driven` : ''}
+            </p>
+            <a href={rover.source.url} target="_blank" rel="noreferrer" className="text-[0.6875rem] font-light text-ink-dim underline decoration-white/20 underline-offset-2 hover:text-ink">{rover.source.label}</a>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1.5 text-[0.6875rem] font-light leading-snug text-muted">Not drawn on the globe: this Mars surface is a model, so a point on it would not be where the rover is.</p>
+    </div>
+  )
+}
+
 function Inspect({ id, places, discovery, onClose, onEngage, onFace, onExplore, compact, touch, reducedMotion, t }) {
   const obj = findTarget(id, places)
   if (!obj) return null
@@ -773,6 +796,7 @@ function Inspect({ id, places, discovery, onClose, onEngage, onFace, onExplore, 
             <p className="mt-0.5 text-[0.8125rem] text-ink">{fact.value}</p>
           </div>
         ))}
+        {obj.id === 'mars' && <RoversOnMars />}
         {entry?.sources?.length > 0 && (
           <>
             <p className="readout mt-4 opacity-60">Sources</p>
@@ -837,6 +861,7 @@ function DisplaySettings({ settings }) {
     ['dust', 'Speed streaks'],
     ['field', 'Procedural field stars'],
     ['belts', 'Asteroid and Kuiper belts (model)'],
+    ['constellations', 'Constellation figures (near the Sun)'],
   ]
   return (
     <div className="glass pointer-events-auto w-[268px] rounded-2xl px-4 py-3" role="group" aria-label="Display and sound">

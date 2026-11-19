@@ -73,22 +73,29 @@ export function toGalactic(raDeg, decDeg) {
  */
 export const mapRadius = (distanceLy) => 5.2 * Math.log10(1 + Math.max(distanceLy, 0) / 1.6)
 
-/** Position on the map: galactic plane in XZ, galactic centre along +X. */
+/**
+ * Galactic longitude/latitude (degrees) and a radius to scene axes: the
+ * galactic plane in XZ, +X to the Galactic Centre, +Y to the north galactic
+ * pole and l = 90° on -Z. That is a rotation of the right-handed galactic
+ * frame into Three.js's right-handed Y-up frame, so the sky is not mirrored.
+ */
+export function galacticToScene(l, b, r) {
+  const rad = Math.PI / 180
+  return [r * Math.cos(b * rad) * Math.cos(l * rad), r * Math.sin(b * rad), -r * Math.cos(b * rad) * Math.sin(l * rad)]
+}
+
+/** Position on the map, at a logarithmically compressed radius. */
 export function mapPosition(entry) {
   if (entry.ra == null || entry.distanceLy == null) return [0, 0, 0]
   const { l, b } = toGalactic(entry.ra, entry.dec)
-  const r = mapRadius(entry.distanceLy)
-  const rad = Math.PI / 180
-  return [r * Math.cos(b * rad) * Math.cos(l * rad), r * Math.sin(b * rad), r * Math.cos(b * rad) * Math.sin(l * rad)]
+  return galacticToScene(l, b, mapRadius(entry.distanceLy))
 }
 
 /** True position in light-years, for real distances between objects. */
 export function truePosition(entry) {
   if (entry.ra == null || entry.distanceLy == null) return [0, 0, 0]
   const { l, b } = toGalactic(entry.ra, entry.dec)
-  const rad = Math.PI / 180
-  const d = entry.distanceLy
-  return [d * Math.cos(b * rad) * Math.cos(l * rad), d * Math.sin(b * rad), d * Math.cos(b * rad) * Math.sin(l * rad)]
+  return galacticToScene(l, b, entry.distanceLy)
 }
 
 // Stars whose planets are in the catalogue share a system with them.
